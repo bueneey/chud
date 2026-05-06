@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { postChudChat, postChudChatClear, type ChudChatTurn } from "./api";
+import { postChudChat, type ChudChatTurn } from "./api";
 
 type Props = {
   chatMessages: ChudChatTurn[];
@@ -43,17 +43,6 @@ export function ChudPanel({ chatMessages, chatLlmConfigured, onRefresh }: Props)
     }
   }
 
-  async function clearChat() {
-    if (!confirm("Clear all chat messages with Chud?")) return;
-    setErr(null);
-    try {
-      await postChudChatClear();
-      onRefresh();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    }
-  }
-
   return (
     <div className="panel chud-panel">
       <div className="panel-title">[ talk to chud ]</div>
@@ -68,7 +57,6 @@ export function ChudPanel({ chatMessages, chatLlmConfigured, onRefresh }: Props)
         <p className="chud-chat-warn">chat is currently offline. configure chud chat in backend settings and restart.</p>
       )}
       <div className="chat-thread" ref={threadRef} aria-label="talk to chud">
-        {chatMessages.length === 0 && <p className="coach-empty">say something, chud will answer in character.</p>}
         {chatMessages.map((m) => (
           <div key={m.id} className={`chat-row ${m.role === "user" ? "chat-row-user" : "chat-row-chud"}`}>
             <span className="chat-meta">{m.role === "user" ? "you" : "chud"} · {new Date(m.at).toLocaleString()}</span>
@@ -78,16 +66,11 @@ export function ChudPanel({ chatMessages, chatLlmConfigured, onRefresh }: Props)
           </div>
         ))}
       </div>
-      <div className="chat-toolbar">
-        <button type="button" className="chat-clear-btn" onClick={clearChat}>
-          clear chat
-        </button>
-      </div>
       <form className="coach-form" onSubmit={sendChat}>
         <textarea
-          className="coach-input"
-          rows={3}
-          placeholder="talk to chud…"
+          className="coach-input chud-input"
+          rows={4}
+          placeholder="ask the chud anything..."
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           maxLength={4000}

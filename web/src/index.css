@@ -725,6 +725,12 @@ a:hover { text-decoration: underline; }
   background: var(--panel-subtle);
   color: var(--text);
 }
+.chud-input {
+  min-height: 116px;
+  border-width: 2px;
+  border-color: rgba(74, 107, 66, 0.45);
+  background: #f3f5f2;
+}
 .coach-input:focus {
   outline: 2px solid rgba(74, 107, 66, 0.45);
   outline-offset: 1px;

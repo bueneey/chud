@@ -189,7 +189,7 @@ export default function App() {
 
       <section className="coach-section" aria-label="talk to chud">
         <h2 className="section-label">talk to chud</h2>
-        <p className="section-desc">chat directly with chud.</p>
+        <p className="section-desc">chat directly with the chud.</p>
         <ChudPanel chatMessages={chatMessages} chatLlmConfigured={chatLlmConfigured} onRefresh={poll} />
       </section>
 

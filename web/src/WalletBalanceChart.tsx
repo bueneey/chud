@@ -26,7 +26,7 @@ export function WalletBalanceChart({ points, width = 800, height = 240 }: Props)
       if (!svgRef.current || points.length < 2) return;
       const rect = svgRef.current.getBoundingClientRect();
       const x = ((e.clientX - rect.left) / rect.width) * width;
-      const padding = { left: 56, right: 24, top: 16, bottom: 44 };
+      const padding = { left: 96, right: 24, top: 16, bottom: 44 };
       const chartW = width - padding.left - padding.right;
       const relX = (x - padding.left) / chartW;
       const idx = Math.round(relX * (points.length - 1));
@@ -52,7 +52,7 @@ export function WalletBalanceChart({ points, width = 800, height = 240 }: Props)
   const minBal = Math.min(...balances);
   const maxBal = Math.max(...balances);
   const range = maxBal - minBal || 0.1;
-  const padding = { top: 16, right: 24, bottom: 44, left: 56 };
+  const padding = { top: 16, right: 24, bottom: 44, left: 96 };
   const chartW = width - padding.left - padding.right;
   const chartH = height - padding.top - padding.bottom;
 
