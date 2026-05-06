@@ -22,8 +22,12 @@ declare module "clawdbot/agent" {
     | { ok: true; symbol: string; tx?: string }
     | { ok: false; error: string }
   >;
-  export function sell(): Promise<
+  export function sell(params?: { reason?: string }): Promise<
     | { ok: true; symbol: string; pnlSol: number; tx?: string }
+    | { ok: false; error: string }
+  >;
+  export function forceClosePosition(params: { reason: string }): Promise<
+    | { ok: true; symbol: string; mint: string }
     | { ok: false; error: string }
   >;
   export function getWalletBalanceSol(): Promise<number | null>;
@@ -32,4 +36,36 @@ declare module "clawdbot/agent" {
 
 declare module "clawdbot" {
   export function startTradingLoop(): Promise<never>;
+}
+
+declare module "clawdbot/coach-notes" {
+  export interface CoachMessage {
+    id: string;
+    at: string;
+    text: string;
+  }
+  export function getCoachMessages(limit?: number): CoachMessage[];
+  export function appendCoachMessage(text: string): CoachMessage;
+}
+
+declare module "clawdbot/outbox" {
+  export type ChudOutbox = { text: string; at: string };
+  export function readChudOutbox(): ChudOutbox | null;
+}
+
+declare module "clawdbot/chud-chat" {
+  export type ChudChatRole = "user" | "assistant";
+  export interface ChudChatTurn {
+    id: string;
+    role: ChudChatRole;
+    content: string;
+    at: string;
+  }
+  export function getChudChatMessages(limit?: number): ChudChatTurn[];
+  export function chudChatLlmConfigured(): boolean;
+  export function sendChudChatUserMessage(
+    userText: string,
+    options?: { alsoCoachNote?: boolean }
+  ): Promise<{ user: ChudChatTurn; assistant: ChudChatTurn }>;
+  export function clearChudChat(): void;
 }

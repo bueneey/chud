@@ -47,9 +47,12 @@ export function TradeFeed({ trades }: Props) {
     return (
       <div className="panel">
         <div className="panel-title">[ trade feed — live ]</div>
-        <p className="trade-feed-desc">every buy and sell appears here as it happens. refreshes every 3s.</p>
+        <p className="trade-feed-desc">
+          every buy and sell as it happens; when there is text, you will see why we bought / why we sold (openclaw{" "}
+          reasons land here too). refreshes every 3s.
+        </p>
         <div className="trade-feed">
-          <p className="trade-feed-empty">no trades yet. when lobbi buys, a buy row will appear; when he sells, a sell row will appear.</p>
+          <p className="trade-feed-empty">no trades yet. when chud buys, a buy row will appear; when he sells, a sell row will appear.</p>
         </div>
       </div>
     );
@@ -58,7 +61,9 @@ export function TradeFeed({ trades }: Props) {
   return (
     <div className="panel">
       <div className="panel-title">[ trade feed — live ]</div>
-      <p className="trade-feed-desc">every buy and sell in time order. refreshes every 3s.</p>
+      <p className="trade-feed-desc">
+        every buy and sell in time order; thesis lines (why / why sold) show when present. refreshes every 3s.
+      </p>
       <div className="trade-feed trade-feed-rows">
         {events.map((ev, i) => (
           <div key={ev.type + ev.trade.id + ev.timestamp + i} className={`trade-feed-row trade-feed-row-${ev.type}`}>

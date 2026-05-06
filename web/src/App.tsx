@@ -5,21 +5,24 @@ import {
   fetchPnl,
   fetchBalanceChart,
   fetchLobbiState,
-  fetchLogs,
+  fetchChudChat,
   type TradeRecord,
   type LobbiState,
   type BalanceChartPoint,
+  type ChudChatTurn,
 } from "./api";
+import { ChudPanel } from "./ChudPanel";
 import { LobbiScene } from "./LobbiScene";
 import { TradeFeed } from "./TradeFeed";
-import { LogsPanel } from "./LogsPanel";
 import { WalletBalanceChart } from "./WalletBalanceChart";
 import DelicateAsciiDots from "./components/ui/delicate-ascii-dots";
 import CursorDitherTrail from "./components/ui/cursor-dither-trail";
 import { CAButton } from "./components/CAButton";
 import { SocialLinks } from "./components/SocialLinks";
+import { CHUD_WALLET } from "./site-config";
 
 const POLL_MS = 3000;
+type PageView = "home" | "feed" | "docs";
 
 export default function App() {
   const [trades, setTrades] = useState<TradeRecord[]>([]);
@@ -27,8 +30,21 @@ export default function App() {
   const [pnl, setPnl] = useState<number>(0);
   const [balanceChartPoints, setBalanceChartPoints] = useState<BalanceChartPoint[]>([]);
   const [state, setState] = useState<LobbiState | null>(null);
-  const [logs, setLogs] = useState<import("./api").LogEntry[]>([]);
+  const [chatMessages, setChatMessages] = useState<ChudChatTurn[]>([]);
+  const [chatLlmConfigured, setChatLlmConfigured] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [walletCopied, setWalletCopied] = useState(false);
+  const [page, setPage] = useState<PageView>("home");
+
+  const latestClosedTrade = trades.find((t) => !!t.sellTimestamp);
+  const isHappy = latestClosedTrade ? latestClosedTrade.pnlSol > 0 : pnl > 0 || balance > 1;
+
+  function copyWallet(): void {
+    navigator.clipboard.writeText(CHUD_WALLET).then(() => {
+      setWalletCopied(true);
+      setTimeout(() => setWalletCopied(false), 2000);
+    });
+  }
 
   function poll() {
     Promise.all([
@@ -37,21 +53,22 @@ export default function App() {
       fetchPnl(),
       fetchBalanceChart(),
       fetchLobbiState(),
-      fetchLogs(100),
+      fetchChudChat().catch(() => ({ messages: [] as ChudChatTurn[], llmConfigured: false })),
     ])
-      .then(([t, b, p, chart, s, logsData]) => {
+      .then(([t, b, p, chart, s, chat]) => {
         setTrades(t);
         setBalance(b);
         setPnl(p.totalPnlSol);
         setBalanceChartPoints(chart.points ?? []);
         setState(s);
-        setLogs(logsData);
+        setChatMessages(chat.messages);
+        setChatLlmConfigured(chat.llmConfigured);
         setError(null);
       })
       .catch((e) => {
         const msg = e?.message ?? String(e) ?? "Failed to fetch";
         setError(msg);
-        console.error("[Lobbi] API error:", msg, e);
+        console.error("[Chud] API error:", msg, e);
       });
   }
 
@@ -63,28 +80,43 @@ export default function App() {
 
   return (
     <div className="app-wrap">
-      <div style={{ opacity: 0.4, position: "fixed", inset: 0, zIndex: 0 }}>
+      <div style={{ opacity: 0.35, position: "fixed", inset: 0, zIndex: 0 }}>
         <DelicateAsciiDots
-          backgroundColor="#f8f9fa"
-          textColor="108, 117, 125"
+          backgroundColor="#bcbcbc"
+          textColor="74, 95, 74"
           gridSize={80}
           removeWaveLine
           animationSpeed={0.75}
         />
       </div>
       <CursorDitherTrail
-        trailColor="#e85d04"
+        trailColor="#6b8f62"
         dotSize={6}
         fadeDuration={1000}
         className="app-cursor-trail"
       />
       <div className="app">
+      <div className="top-nav" aria-label="site pages">
+        <button type="button" className={`top-nav-btn ${page === "home" ? "active" : ""}`} onClick={() => setPage("home")}>
+          home page
+        </button>
+        <button
+          type="button"
+          className={`top-nav-btn ${page === "feed" ? "active" : ""}`}
+          onClick={() => setPage("feed")}
+        >
+          live trade feed
+        </button>
+        <button type="button" className={`top-nav-btn ${page === "docs" ? "active" : ""}`} onClick={() => setPage("docs")}>
+          docs
+        </button>
+      </div>
       <header className="header">
-        <img src="/lobbi.png" alt="lobbi" />
+        <img src={isHappy ? "/chudhappy.png" : "/chudpfptbg.png"} alt="Chud the Trader" />
         <div className="header-titles">
-          <h1>lobbi</h1>
+          <h1>chud the trader</h1>
           <span className="header-sub">
-            lobbi · powered by openclaw · one position at a time · ai decides when to buy/sell
+            the chud starts with 1 SOL, knows nothing, and has to learn by trading one position at a time, all live.
           </span>
         </div>
         <div className="header-right">
@@ -100,24 +132,28 @@ export default function App() {
         </div>
       )}
 
-      <section className="about-section" aria-label="about lobbi">
+      {page === "home" && (
+        <>
+      <section className="about-section" aria-label="about chud the trader">
         <h2 className="section-label">about</h2>
         <div className="panel about-panel">
           <p>
-            <strong>lobbi</strong> is an autonomous trading agent that trades solana memecoins on pump.fun. no prompts, no manual triggers—it runs 24/7, finds coins, buys, and decides when to sell using ai analysis. powered by{" "}
-            <a href="https://openclaw.ai" target="_blank" rel="noopener noreferrer">openclaw</a>. you just watch.
+            chud the trader is just a chud, no strategy, no brain, no logic. he is given 1 SOL, with the only goal of
+            not loosing it.
           </p>
           <p>
-            <strong>it starts with 1 SOL and trades it up, as long as it can.</strong>
+            he isnt taught how to trade, but forced to learn it himself. he journals his trades live, and posts whatever
+            he feels like on x. all automated by openclaw.
           </p>
           <p>
-            <strong>how it works:</strong> lobbi scans pump.fun for coins, picks based on narrative and holder quality, then buys. for sells, it uses ai to judge price action and momentum—when to take profits, when to cut losses—with no fixed tp/sl. one position at a time, flips in minutes.
+            will the chud stay chudded, or will he change?
           </p>
           <p>
-            the bot wallet trades in real time. every buy and sell shows in the feed below, with exact pnl per trade. creator rewards from the wallet fund the claw and keep it running.
-          </p>
-          <p>
-            the X account is automated—it posts about what lobbi is thinking, current wallet balance, and the trades it took.
+            <strong>track the chud:</strong>{" "}
+            <button type="button" className="ca-button ca-button-footer" onClick={copyWallet} title="copy wallet address">
+              {CHUD_WALLET}
+              {walletCopied && <span className="ca-copied"> ✓</span>}
+            </button>
           </p>
         </div>
       </section>
@@ -143,33 +179,58 @@ export default function App() {
         </div>
       </section>
 
+      <section className="feed-section" aria-label="live trade feed">
+        <h2 className="section-label">live trade feed</h2>
+        <p className="section-desc">
+          every buy and sell in time order, with why bought and why sold when available.
+        </p>
+        <TradeFeed trades={trades} />
+      </section>
+
       <section className="claw-section" aria-label="live claw">
         <h2 className="section-label">live claw</h2>
         <p className="section-desc">
-          lobbi scans candidates, picks based on narrative + holder quality, and decides when to buy/sell. no fixed tp/sl—lobbi analyses metrics in real time. powered by openclaw.
+          live view of what chud is scanning, holding, or exiting.
         </p>
-        <LobbiScene state={state} trades={trades} />
+        <LobbiScene state={state} trades={trades} isHappy={isHappy} />
       </section>
 
-      <section className="logs-section" aria-label="ai logs">
-        <h2 className="section-label">ai logs</h2>
-        <p className="section-desc">lobbi&apos;s internal reasoning—scanning, choosing tokens, hold/sell decisions. live.</p>
-        <LogsPanel logs={logs} />
-      </section>
-
-      <section className="feed-section" aria-label="live trade feed">
-        <h2 className="section-label">live trade feed</h2>
-        <p className="section-desc">every buy and sell from the autonomous bot, in time order. hover the chart below to see wallet balance at each point.</p>
-        <TradeFeed trades={trades} />
+      <section className="coach-section" aria-label="talk to chud">
+        <h2 className="section-label">talk to chud</h2>
+        <p className="section-desc">chat directly with chud.</p>
+        <ChudPanel chatMessages={chatMessages} chatLlmConfigured={chatLlmConfigured} onRefresh={poll} />
       </section>
 
       <section className="balance-chart-section" aria-label="wallet balance over time">
         <h2 className="section-label">wallet balance chart</h2>
+        <p className="section-desc">balance history over time.</p>
         <div className="panel balance-chart-panel">
           <div className="panel-title">[ bot wallet balance over time ]</div>
           <WalletBalanceChart points={balanceChartPoints} />
         </div>
       </section>
+      </>
+      )}
+
+      {page === "feed" && (
+        <section className="feed-section" aria-label="live trade feed">
+          <h2 className="section-label">live trade feed</h2>
+          <p className="section-desc">every buy and sell in time order, with reasons when available.</p>
+          <TradeFeed trades={trades} />
+        </section>
+      )}
+
+      {page === "docs" && (
+        <section aria-label="docs">
+          <h2 className="section-label">docs</h2>
+          <div className="panel about-panel">
+            <p><strong>what this is</strong>: chud starts with 1 SOL and learns by doing, live.</p>
+            <p><strong>home page</strong>: mood, wallet, live claw, chat, and balance chart.</p>
+            <p><strong>live trade feed</strong>: timeline of buys and sells with thesis text.</p>
+            <p><strong>powered by</strong>: openclaw runs the automation loop.</p>
+          </div>
+        </section>
+      )}
 
       <footer className="footer">
         <div className="footer-main">
@@ -177,7 +238,7 @@ export default function App() {
           <SocialLinks />
         </div>
         <p className="footer-text">
-          lobbi memecoin · lobbi trades solana memecoins (powered by openclaw) · creator rewards fund the claw
+          chud the trader · solana memecoins (powered by openclaw) · creator rewards fund the claw
         </p>
       </footer>
       </div>

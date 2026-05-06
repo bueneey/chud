@@ -1,5 +1,5 @@
-export const GITHUB_URL = "https://github.com/oubadam/lobbi";
-export const X_URL = "https://x.com/lobbithelobster";
+export const GITHUB_URL = "https://github.com/oubadam/chud-the-trader";
+export const X_URL = "https://x.com/chudthetrader";
 
 export function SocialLinks() {
   return (

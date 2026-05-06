@@ -1,2 +1,5 @@
-/** Edit this with your Lobbi token contract address (Pump.fun CA) */
-export const LOBBI_CA = "CtDcxzuopxFvx5YuSUCswSfH3iSSHXEw6bTgJefYpump";
+/** Chud the Trader token contract address (Pump.fun CA) */
+export const CHUD_CA = "chud...pump";
+
+/** Chud wallet address (replace later) */
+export const CHUD_WALLET = "WALLET_ADDRESS";

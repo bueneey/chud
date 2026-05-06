@@ -189,7 +189,8 @@ app.post("/api/agent/buy", async (req, res) => {
 app.post("/api/agent/sell", async (req, res) => {
   try {
     const { sell: agentSell } = await import("clawdbot/agent");
-    const result = await agentSell();
+    const reason = typeof req.body?.reason === "string" ? req.body.reason : undefined;
+    const result = await agentSell({ reason });
     res.json(result);
   } catch (e) {
     console.error("[Backend] Agent sell error:", e);
@@ -200,15 +201,115 @@ app.post("/api/agent/sell", async (req, res) => {
   }
 });
 
+/** Mark open trade closed in Chud data **without** PumpPortal (stuck sell / graduated token). Requires secret. */
+app.post("/api/agent/force-close", async (req, res) => {
+  try {
+    const secret = process.env.CHUD_FORCE_CLOSE_SECRET?.trim();
+    if (!secret) {
+      return res.status(503).json({
+        ok: false,
+        error: "Set CHUD_FORCE_CLOSE_SECRET in .env to enable POST /api/agent/force-close",
+      });
+    }
+    const got = String(req.headers["x-chud-force-close"] ?? req.body?.secret ?? "").trim();
+    if (got !== secret) {
+      return res.status(403).json({ ok: false, error: "Invalid or missing secret (header X-Chud-Force-Close or body.secret)" });
+    }
+    const reason = typeof req.body?.reason === "string" ? req.body.reason : "force close";
+    const { forceClosePosition } = await import("clawdbot/agent");
+    const result = await forceClosePosition({ reason });
+    res.json(result);
+  } catch (e) {
+    console.error("[Backend] Agent force-close error:", e);
+    res.status(500).json({ ok: false, error: e instanceof Error ? e.message : String(e) });
+  }
+});
+
+app.get("/api/coach/messages", async (_req, res) => {
+  try {
+    const { getCoachMessages } = await import("clawdbot/coach-notes");
+    res.json({ messages: getCoachMessages(100) });
+  } catch (e) {
+    console.error("[Backend] coach messages error:", e);
+    res.status(503).json({ error: "Coach API unavailable. Build clawdbot.", detail: String(e) });
+  }
+});
+
+app.post("/api/coach/messages", async (req, res) => {
+  try {
+    const { appendCoachMessage } = await import("clawdbot/coach-notes");
+    const text = typeof req.body?.text === "string" ? req.body.text : "";
+    const msg = appendCoachMessage(text);
+    res.json({ ok: true, message: msg });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    res.status(400).json({ ok: false, error: msg });
+  }
+});
+
+app.get("/api/chat/messages", async (_req, res) => {
+  try {
+    const { getChudChatMessages, chudChatLlmConfigured } = await import("clawdbot/chud-chat");
+    res.json({ messages: getChudChatMessages(100), llmConfigured: chudChatLlmConfigured() });
+  } catch (e) {
+    console.error("[Backend] chat messages error:", e);
+    res.status(503).json({ error: "Chat unavailable. Build clawdbot.", detail: String(e) });
+  }
+});
+
+app.post("/api/chat/messages", async (req, res) => {
+  try {
+    const { sendChudChatUserMessage } = await import("clawdbot/chud-chat");
+    const text = typeof req.body?.text === "string" ? req.body.text : "";
+    const alsoCoachNote = req.body?.alsoCoachNote === true;
+    const out = await sendChudChatUserMessage(text, { alsoCoachNote });
+    res.json({ ok: true, user: out.user, assistant: out.assistant });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    const code = msg.includes("No ANTHROPIC") || msg.includes("No LLM") ? 503 : 400;
+    res.status(code).json({ ok: false, error: msg });
+  }
+});
+
+app.post("/api/chat/clear", async (_req, res) => {
+  try {
+    const { clearChudChat } = await import("clawdbot/chud-chat");
+    clearChudChat();
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(503).json({ ok: false, error: String(e) });
+  }
+});
+
+app.get("/api/chud/outbox", async (_req, res) => {
+  try {
+    const { readChudOutbox } = await import("clawdbot/outbox");
+    const o = readChudOutbox();
+    if (!o) {
+      return res.json({
+        text: null,
+        at: null,
+        hint: "nothing yet — set CHUD_THOUGHT_POST_MINUTES in .env and wait one cycle",
+      });
+    }
+    res.json(o);
+  } catch (e) {
+    res.status(503).json({ error: "outbox unavailable", detail: String(e) });
+  }
+});
+
 app.get("/api/agent/info", (_req, res) => {
   res.json({
-    message: "Lobbi agent API. Use GET /api/agent/candidates, GET /api/agent/position, POST /api/agent/buy, POST /api/agent/sell. Lobbi runs on OpenClaw.",
+    message:
+      "Chud agent API. GET candidates, position. POST buy / sell. POST force-close (CHUD_FORCE_CLOSE_SECRET). Sells retry pools: auto,raydium,pump-amm,raydium-cpmm,launchlab,bonk,pump (CHUD_SELL_POOL_FALLBACKS).",
     baseUrl: LOBBI_AGENT_BASE,
     endpoints: {
       candidates: `${LOBBI_AGENT_BASE}/api/agent/candidates`,
       position: `${LOBBI_AGENT_BASE}/api/agent/position`,
       buy: `${LOBBI_AGENT_BASE}/api/agent/buy`,
       sell: `${LOBBI_AGENT_BASE}/api/agent/sell`,
+      forceClose: `${LOBBI_AGENT_BASE}/api/agent/force-close`,
+      chudOutbox: `${LOBBI_AGENT_BASE}/api/chud/outbox`,
     },
   });
 });

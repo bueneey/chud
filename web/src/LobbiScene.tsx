@@ -9,13 +9,14 @@ function stripUrls(text: string): string {
 interface Props {
   state: LobbiState | null;
   trades: TradeRecord[];
+  isHappy: boolean;
 }
 
 function getOpenTrade(trades: TradeRecord[]): TradeRecord | null {
   return trades.find((t) => !t.sellTimestamp || t.sellTimestamp === "") ?? null;
 }
 
-export function LobbiScene({ state, trades }: Props) {
+export function LobbiScene({ state, trades, isHappy }: Props) {
   const [copiedMint, setCopiedMint] = useState(false);
   const kind = state?.kind ?? "idle";
   const message = state?.message ?? "";
@@ -108,8 +109,8 @@ export function LobbiScene({ state, trades }: Props) {
         </div>
         <div className="lobbi-sprite-container" aria-hidden>
           <img
-            src="/lobbi.png"
-            alt="lobbi"
+            src={isHappy ? "/chudhappy.png" : "/chudpfptbg.png"}
+            alt="Chud the Trader"
             className={`lobbi-sprite ${hasPosition ? "bought" : kind}`}
           />
         </div>

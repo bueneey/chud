@@ -8,7 +8,7 @@ interface CursorDitherTrailProps {
 }
 
 export default function CursorDitherTrail({
-  trailColor = "#e85d04",
+  trailColor = "#6b8f62",
   dotSize = 6,
   fadeDuration = 1000,
   className = "w-screen h-screen",

@@ -71,6 +71,18 @@ export function getRecentMints(lastN: number): string[] {
   return closed.slice(0, lastN).map((t) => t.mint);
 }
 
+/** Closed trades for LLM “memory” — newest first. */
+export function getRecentClosedTradesSummary(maxLines: number): string {
+  const trades = loadTrades();
+  const closed = trades.filter((t) => t.sellTimestamp && t.sellTimestamp !== "");
+  const lines = closed.slice(0, maxLines).map((t) => {
+    const pnl = Number.isFinite(t.pnlSol) ? (t.pnlSol >= 0 ? "+" : "") + t.pnlSol.toFixed(3) : "?";
+    const note = (t.whySold ?? "").slice(0, 140).replace(/\s+/g, " ").trim();
+    return `- $${t.symbol}: ${pnl} SOL${note ? ` — ${note}` : ""}`;
+  });
+  return lines.length ? lines.join("\n") : "(no closed trades yet—this is the prequel)";
+}
+
 /** Returns true if we already have a buy record for this mint+tx (prevents duplicate entries). */
 export function hasDuplicateBuy(mint: string, txBuy?: string): boolean {
   const all = loadTrades();
@@ -136,6 +148,26 @@ export function getOpenTrade(): TradeRecord | null {
   const all = loadTrades();
   const t = all.find((x) => !x.sellTimestamp || x.sellTimestamp === "");
   return t ?? null;
+}
+
+/**
+ * Mark the open trade closed **without** an on-chain sell (PumpPortal 400, graduated token, etc.).
+ * PnL recorded as 0 SOL (sellSol = buySol). Wallet may still hold tokens — user must handle on-chain if needed.
+ */
+export function forceCloseOpenTrade(whySold: string): { ok: true; symbol: string; mint: string } | { ok: false; error: string } {
+  const open = getOpenTrade();
+  if (!open) return { ok: false, error: "No open trade" };
+  const ts = new Date().toISOString();
+  updateOpenTradeToSold(
+    open.buySol,
+    open.buyTokenAmount,
+    ts,
+    "force_close",
+    open.mcapUsd,
+    whySold,
+    open.volumeAtBuyUsd
+  );
+  return { ok: true, symbol: open.symbol, mint: open.mint };
 }
 
 export function getState(): LobbiState | null {

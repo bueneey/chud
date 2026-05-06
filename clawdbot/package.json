@@ -5,7 +5,10 @@
   "main": "dist/index.js",
   "exports": {
     ".": "./dist/index.js",
-    "./agent": "./dist/agent-api.js"
+    "./agent": "./dist/agent-api.js",
+    "./coach-notes": "./dist/coach-notes.js",
+    "./chud-chat": "./dist/chud-chat.js",
+    "./outbox": "./dist/outbox.js"
   },
   "scripts": {
     "dev": "tsx watch src/index.ts",

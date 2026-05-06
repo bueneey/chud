@@ -141,3 +141,124 @@ export async function fetchFilters(): Promise<FiltersConfig> {
   const res = await apiFetch("/filters");
   return res.json();
 }
+
+export interface CoachMessage {
+  id: string;
+  at: string;
+  text: string;
+}
+
+export async function fetchCoachMessages(): Promise<CoachMessage[]> {
+  const res = await apiFetch("/coach/messages");
+  const data = await res.json();
+  return data.messages ?? [];
+}
+
+export interface ChudChatTurn {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  at: string;
+}
+
+export async function fetchChudChat(): Promise<{ messages: ChudChatTurn[]; llmConfigured: boolean }> {
+  const res = await apiFetch("/chat/messages");
+  const data = await res.json();
+  return {
+    messages: data.messages ?? [],
+    llmConfigured: data.llmConfigured === true,
+  };
+}
+
+export async function postChudChat(text: string, alsoCoachNote = false): Promise<{ user: ChudChatTurn; assistant: ChudChatTurn }> {
+  const res = await fetch(`${API}/chat/messages`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, alsoCoachNote }),
+  });
+  if (!res.ok) {
+    const textBody = await res.text();
+    let msg = `API /chat/messages: ${res.status}`;
+    try {
+      const j = JSON.parse(textBody);
+      if (j?.error) msg = j.error;
+    } catch {
+      if (textBody) msg += " " + textBody.slice(0, 200);
+    }
+    throw new Error(msg);
+  }
+  const data = (await res.json()) as { user?: ChudChatTurn; assistant?: ChudChatTurn };
+  if (!data.user || !data.assistant) throw new Error("Bad chat response");
+  return { user: data.user, assistant: data.assistant };
+}
+
+export async function postChudChatClear(): Promise<void> {
+  const res = await fetch(`${API}/chat/clear`, { method: "POST" });
+  if (!res.ok) {
+    const t = await res.text();
+    throw new Error(t || `clear failed ${res.status}`);
+  }
+}
+
+/** Latest auto line for X (outbox file); soft-fail so the main poll never breaks. */
+export interface ChudOutboxResponse {
+  text: string | null;
+  at: string | null;
+  hint?: string;
+}
+
+export async function fetchChudOutbox(): Promise<ChudOutboxResponse> {
+  try {
+    const res = await fetch(`${API}/chud/outbox`);
+    if (!res.ok) {
+      return { text: null, at: null, hint: `outbox unavailable (${res.status})` };
+    }
+    return (await res.json()) as ChudOutboxResponse;
+  } catch {
+    return { text: null, at: null, hint: "could not reach backend" };
+  }
+}
+
+/** Same JSON as GET /api/agent/position (OpenClaw + site). */
+export interface AgentPositionResponse {
+  openTrade: TradeRecord | null;
+  quote?: {
+    currentPriceUsd: number | null;
+    unrealizedPnlPercent: number | null;
+    unrealizedPnlSol: number | null;
+    buyPriceUsd: number | null;
+    holdSeconds: number;
+  };
+}
+
+export async function fetchAgentPosition(): Promise<AgentPositionResponse | null> {
+  try {
+    const res = await fetch(`${API}/agent/position`);
+    if (!res.ok) return null;
+    return (await res.json()) as AgentPositionResponse;
+  } catch {
+    return null;
+  }
+}
+
+export async function postCoachMessage(text: string): Promise<CoachMessage> {
+  const res = await fetch(`${API}/coach/messages`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+  if (!res.ok) {
+    const textBody = await res.text();
+    let msg = `API /coach/messages: ${res.status}`;
+    try {
+      const j = JSON.parse(textBody);
+      if (j?.error) msg = j.error;
+    } catch {
+      if (textBody) msg += " " + textBody.slice(0, 200);
+    }
+    throw new Error(msg);
+  }
+  const data = (await res.json()) as { message?: CoachMessage };
+  if (!data.message) throw new Error("No message returned");
+  return data.message;
+}

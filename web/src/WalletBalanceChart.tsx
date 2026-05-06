@@ -151,7 +151,7 @@ export function WalletBalanceChart({ points, width = 800, height = 240 }: Props)
               cy={y(hover.point.balanceSol)}
               r={6}
               fill="var(--lobbi-orange)"
-              stroke="white"
+              stroke="var(--text)"
               strokeWidth={2}
             />
           </g>

@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { LOBBI_CA } from "../site-config";
+import { CHUD_CA } from "../site-config";
 
 interface Props {
   variant?: "header" | "footer";
@@ -7,7 +7,7 @@ interface Props {
 
 export function CAButton({ variant = "header" }: Props) {
   const [copied, setCopied] = useState(false);
-  const ca = LOBBI_CA && !LOBBI_CA.startsWith("YOUR_") ? LOBBI_CA : "...";
+  const ca = CHUD_CA && !CHUD_CA.startsWith("YOUR_") ? CHUD_CA : "...";
 
   const copyAddress = useCallback(() => {
     navigator.clipboard.writeText(ca).then(() => {
@@ -16,7 +16,7 @@ export function CAButton({ variant = "header" }: Props) {
     });
   }, [ca]);
 
-  const short = ca.length > 10 ? ca.slice(0, 6) + "…" + ca.slice(-4) : ca;
+  const short = ca.includes("...") ? ca : ca.length > 10 ? ca.slice(0, 6) + "…" + ca.slice(-4) : ca;
   const isCompact = variant === "header";
 
   return (

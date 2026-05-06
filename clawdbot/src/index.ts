@@ -8,7 +8,17 @@ const envPath = [
 ].find((p) => existsSync(p));
 if (envPath) config({ path: envPath });
 import { loadFilters, getDataDir, DEMO_MODE, getLobbiOwnTokenMint } from "./config.js";
-import { setState, getOpenTrade, getRecentMints, tryAcquireCycleLock, releaseCycleLock, clearStaleOpenTrades, updateOpenTradeToSold, appendLog } from "./storage.js";
+import {
+  setState,
+  getOpenTrade,
+  getRecentMints,
+  getRecentClosedTradesSummary,
+  tryAcquireCycleLock,
+  releaseCycleLock,
+  clearStaleOpenTrades,
+  updateOpenTradeToSold,
+  appendLog,
+} from "./storage.js";
 import { discoverCandidates } from "./discovery.js";
 import { loadKeypair } from "./wallet.js";
 import { executeBuy, executeSell, recordOpenBuy, getWalletBalanceSol } from "./trade.js";
@@ -23,10 +33,20 @@ import {
   emitSold,
 } from "./state.js";
 import { getPositionWithQuote } from "./agent-api.js";
-import { askLobbiShouldSell } from "./llm.js";
+import { askChudShouldSell, askChudPickCandidate } from "./llm.js";
+import { anyChudLlmConfigured } from "./llm-provider-order.js";
+import { postChudTweetBuy, postChudTweetSell, isXPostingConfigured, describeXPosting } from "./x-post.js";
+import { maybeStartThoughtPosting } from "./thought-post.js";
 import type { CandidateCoin, HoldPlan, LobbiState } from "./types.js";
 
-const HOLD_POLL_MS = 5_000;
+/**
+ * How often to ask Claude “sell or hold?” while you have a position open.
+ * Default 2 minutes so idle bags do not burn credits (15s × 240/hr adds up fast).
+ * Set CHUD_HOLD_POLL_MS lower only if you want faster reactions.
+ */
+const HOLD_POLL_MS = Math.max(30_000, Number(process.env.CHUD_HOLD_POLL_MS || "120000"));
+/** If >0, force a sell after this many minutes regardless of LLM. Default 0 = never (Chud only exits when the model says SELL). */
+const FORCE_SELL_AFTER_MIN = Math.max(0, Number(process.env.CHUD_FORCE_SELL_AFTER_MINUTES || "0"));
 let _loggedNoWallet = false;
 
 function sleep(ms: number): Promise<void> {
@@ -37,9 +57,7 @@ function pickOne<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]!;
 }
 
-const MAX_HOLD_SECONDS = 10 * 60; // 10 min hard cap—don't hold longer
-
-/** Hold position; Lobbi (via LLM) decides when to sell. Autonomous—no human prompt needed. */
+/** Hold position; Chud (via LLM) decides when to sell from narrative + tape + recent trades. */
 async function holdAndSell(
   mint: string,
   symbol: string,
@@ -48,9 +66,16 @@ async function holdAndSell(
   filters: ReturnType<typeof loadFilters>,
   _plan: HoldPlan
 ): Promise<void> {
-  const hasLlm = !!(process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY);
+  const hasLlm = anyChudLlmConfigured();
   if (!hasLlm) {
-    console.warn("[Lobbi] No ANTHROPIC_API_KEY or OPENAI_API_KEY—Lobbi cannot decide when to sell. Set one for autonomous trading.");
+    console.warn(
+      "[Chud] No LLM configured—cannot decide when to sell. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY, or OLLAMA_MODEL; or use CHUD_FORCE_SELL_AFTER_MINUTES."
+    );
+  }
+  if (!hasLlm && FORCE_SELL_AFTER_MIN <= 0) {
+    console.warn(
+      "[Chud] No LLM keys and CHUD_FORCE_SELL_AFTER_MINUTES is 0 — this position will never auto-exit. Add keys or set e.g. CHUD_FORCE_SELL_AFTER_MINUTES=120."
+    );
   }
   const ownTokenMint = getLobbiOwnTokenMint();
 
@@ -67,11 +92,17 @@ async function holdAndSell(
     let shouldSell: boolean;
     let reason: string | undefined;
 
-    if (holdSeconds >= MAX_HOLD_SECONDS) {
-      console.log("[Lobbi] Max hold time reached (10m), forcing sell.");
+    if (FORCE_SELL_AFTER_MIN > 0 && holdSeconds >= FORCE_SELL_AFTER_MIN * 60) {
+      console.log(`[Chud] Force sell after ${FORCE_SELL_AFTER_MIN}m (CHUD_FORCE_SELL_AFTER_MINUTES).`);
       shouldSell = true;
-      reason = `Max hold 10m—time-based exit (held ${Math.floor(holdSeconds / 60)}m)`;
-      appendLog({ type: "sell", symbol, message: `Max hold 10m—forcing sell`, reason, holdMin: Math.floor(holdSeconds / 60) });
+      reason = `Force exit after ${FORCE_SELL_AFTER_MIN}m (timer)—held ${Math.floor(holdSeconds / 60)}m`;
+      appendLog({
+        type: "sell",
+        symbol,
+        message: `Force sell ${FORCE_SELL_AFTER_MIN}m`,
+        reason,
+        holdMin: Math.floor(holdSeconds / 60),
+      });
     } else if (!hasLlm) {
       continue;
     } else {
@@ -80,12 +111,13 @@ async function holdAndSell(
         const pos = await getPositionWithQuote();
         quote = pos.quote;
       } catch (e) {
-        console.warn("[Lobbi] getPositionWithQuote failed:", e);
+        console.warn("[Chud] getPositionWithQuote failed:", e);
         continue;
       }
       if (!quote) continue;
 
-      const result = await askLobbiShouldSell(symbol, open.why ?? "", quote);
+      const memory = getRecentClosedTradesSummary(8);
+      const result = await askChudShouldSell(symbol, open.why ?? "", quote, memory);
       shouldSell = result.shouldSell;
       reason = result.reason;
       const pnlPct = quote?.unrealizedPnlPercent ?? 0;
@@ -98,7 +130,7 @@ async function holdAndSell(
     }
     if (!shouldSell) continue;
 
-    console.log("[Lobbi] Selling:", reason ?? "LLM decided");
+    console.log("[Chud] Selling:", reason ?? "LLM decided");
     const balBefore = await getWalletBalanceSol();
     const res = await executeSell(mint, tokenAmount, filters);
     let solReceived = res.solReceived;
@@ -115,9 +147,10 @@ async function holdAndSell(
       solReceived = buySol * (mcapAtSellUsd / open.mcapUsd);
     }
     if (solReceived <= 0) solReceived = buySol * 0.95;
-    const whySold = reason ?? "Lobbi exit";
+    const whySold = reason ?? "Chud exit";
     updateOpenTradeToSold(solReceived, tokenAmount, sellTimestamp, res.tx, mcapAtSellUsd ?? undefined, whySold, volumeAtSellUsd);
     emitSold(mint, symbol, solReceived - buySol, res.tx);
+    postChudTweetSell(symbol, solReceived - buySol, whySold);
     return;
   }
 }
@@ -210,12 +243,35 @@ async function runCycleBody(): Promise<void> {
   emitChoosing(candidates);
   await sleep(1000);
 
-  const chosen = pickOne(candidates);
-  appendLog({
-    type: "chosen",
-    symbol: chosen.symbol,
-    message: `Chose $${chosen.symbol} — ${chosen.reason}`,
-  });
+  const hasLlmPick = anyChudLlmConfigured();
+  let chosen: CandidateCoin;
+  let pickNarrative = "";
+  if (hasLlmPick) {
+    const pick = await askChudPickCandidate(candidates);
+    if (pick && pick.index >= 0 && pick.index < candidates.length) {
+      chosen = candidates[pick.index]!;
+      pickNarrative = pick.narrative;
+      appendLog({
+        type: "chosen",
+        symbol: chosen.symbol,
+        message: `Chud picked $${chosen.symbol} — ${pickNarrative.slice(0, 240)}`,
+      });
+    } else {
+      chosen = pickOne(candidates);
+      appendLog({
+        type: "chosen",
+        symbol: chosen.symbol,
+        message: `Chose $${chosen.symbol} — ${chosen.reason} (LLM pick failed, random)`,
+      });
+    }
+  } else {
+    chosen = pickOne(candidates);
+    appendLog({
+      type: "chosen",
+      symbol: chosen.symbol,
+      message: `Chose $${chosen.symbol} — ${chosen.reason} (no LLM keys—random)`,
+    });
+  }
   if (chosen.mint.startsWith("DemoMint") || (ownTokenMint && chosen.mint === ownTokenMint)) {
     emitIdle();
     return;
@@ -273,7 +329,8 @@ async function runCycleBody(): Promise<void> {
     chosen.pairCreatedAt != null
       ? Math.round((Date.now() - chosen.pairCreatedAt) / 60000)
       : undefined;
-  const narrativeWhy = buildNarrativeWhy(chosen, plan, holderStats, ageMinutesAtBuy);
+  const baseWhy = buildNarrativeWhy(chosen, plan, holderStats, ageMinutesAtBuy);
+  const narrativeWhy = pickNarrative ? `${pickNarrative}\n—\n${baseWhy}` : baseWhy;
   appendLog({
     type: "bought",
     symbol: chosen.symbol,
@@ -297,6 +354,7 @@ async function runCycleBody(): Promise<void> {
   const holderCount = holderStats?.holderCount;
   const buyReason = narrativeWhy;
   emitBought(chosen.mint, chosen.symbol, txBuy, mcapAtBuyUsd ?? chosen.mcapUsd ?? undefined, holderCount, buyReason);
+  postChudTweetBuy(chosen.symbol, buySol);
   await sleep(2000);
 
   await holdAndSell(chosen.mint, chosen.symbol, buySol, tokenAmount, filters, plan);
@@ -322,6 +380,17 @@ export async function startTradingLoop(): Promise<never> {
     (f.loopDelayMs ?? 180000) / 1000 + "s. Min hold:",
     f.holdMinSeconds + "s."
   );
+  if (isXPostingConfigured()) {
+    console.log("[Chud/X] Posting:", describeXPosting());
+  }
+  console.log(
+    `[Chud/LLM] hold poll every ${HOLD_POLL_MS / 1000}s · force sell after ${FORCE_SELL_AFTER_MIN || "∞"} min (CHUD_FORCE_SELL_AFTER_MINUTES)`
+  );
+  if (process.env.ANTHROPIC_API_KEY?.trim() && HOLD_POLL_MS < 120_000) {
+    console.warn(
+      "[Chud/LLM] Anthropic + hold poll under 2 min → API cost scales quickly. Try CHUD_HOLD_POLL_MS=300000 (5m) or higher."
+    );
+  }
 
   const open = getOpenTrade();
   if (open) {
@@ -351,4 +420,19 @@ export async function startTradingLoop(): Promise<never> {
   }
 }
 
-startTradingLoop();
+const openclawOnly =
+  process.env.CHUD_OPENCLAW_ONLY === "1" ||
+  process.env.CHUD_OPENCLAW_ONLY === "true" ||
+  process.env.CHUD_AUTONOMOUS_LOOP === "0" ||
+  process.env.CHUD_AUTONOMOUS_LOOP === "false";
+
+if (openclawOnly) {
+  console.log(
+    "[Clawdbot] Autonomous loop is OFF (CHUD_OPENCLAW_ONLY or CHUD_AUTONOMOUS_LOOP=false). " +
+      "Trades + X posts on buy/sell happen when something calls the agent API (e.g. OpenClaw + chud_trading skill)."
+  );
+} else {
+  void startTradingLoop();
+}
+
+maybeStartThoughtPosting();
