@@ -6,10 +6,14 @@ import {
   fetchBalanceChart,
   fetchLobbiState,
   fetchChudChat,
+  fetchLogs,
+  fetchChudOutbox,
   type TradeRecord,
   type LobbiState,
   type BalanceChartPoint,
   type ChudChatTurn,
+  type LogEntry,
+  type ChudOutboxResponse,
 } from "./api";
 import { ChudPanel } from "./ChudPanel";
 import { LobbiScene } from "./LobbiScene";
@@ -22,9 +26,10 @@ import { SocialLinks } from "./components/SocialLinks";
 import { CHUD_WALLET } from "./site-config";
 
 const POLL_MS = 3000;
-type PageView = "home" | "feed" | "docs";
+type PageView = "home" | "feed" | "logs";
 
 export default function App() {
+  const blownPortCount = 0; // manual counter: update this value whenever needed
   const [trades, setTrades] = useState<TradeRecord[]>([]);
   const [balance, setBalance] = useState<number>(0);
   const [pnl, setPnl] = useState<number>(0);
@@ -32,6 +37,8 @@ export default function App() {
   const [state, setState] = useState<LobbiState | null>(null);
   const [chatMessages, setChatMessages] = useState<ChudChatTurn[]>([]);
   const [chatLlmConfigured, setChatLlmConfigured] = useState(false);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [outbox, setOutbox] = useState<ChudOutboxResponse>({ text: null, at: null });
   const [error, setError] = useState<string | null>(null);
   const [walletCopied, setWalletCopied] = useState(false);
   const [page, setPage] = useState<PageView>("home");
@@ -54,8 +61,10 @@ export default function App() {
       fetchBalanceChart(),
       fetchLobbiState(),
       fetchChudChat().catch(() => ({ messages: [] as ChudChatTurn[], llmConfigured: false })),
+      fetchLogs(200).catch(() => [] as LogEntry[]),
+      fetchChudOutbox(),
     ])
-      .then(([t, b, p, chart, s, chat]) => {
+      .then(([t, b, p, chart, s, chat, logsData, outboxData]) => {
         setTrades(t);
         setBalance(b);
         setPnl(p.totalPnlSol);
@@ -63,6 +72,8 @@ export default function App() {
         setState(s);
         setChatMessages(chat.messages);
         setChatLlmConfigured(chat.llmConfigured);
+        setLogs(logsData);
+        setOutbox(outboxData);
         setError(null);
       })
       .catch((e) => {
@@ -107,8 +118,8 @@ export default function App() {
         >
           live trade feed
         </button>
-        <button type="button" className={`top-nav-btn ${page === "docs" ? "active" : ""}`} onClick={() => setPage("docs")}>
-          docs
+        <button type="button" className={`top-nav-btn ${page === "logs" ? "active" : ""}`} onClick={() => setPage("logs")}>
+          chud logs
         </button>
       </div>
       <header className="header">
@@ -201,6 +212,14 @@ export default function App() {
           <WalletBalanceChart points={balanceChartPoints} />
         </div>
       </section>
+      <section aria-label="blown port counter">
+        <div className="panel stat-box">
+          <div className="panel-title">chud damage report</div>
+          <div className="stat-value">
+            the chud trader has blown his port <u>{blownPortCount}</u> times
+          </div>
+        </div>
+      </section>
       </>
       )}
 
@@ -212,14 +231,29 @@ export default function App() {
         </section>
       )}
 
-      {page === "docs" && (
-        <section aria-label="docs">
-          <h2 className="section-label">docs</h2>
+      {page === "logs" && (
+        <section aria-label="chud logs">
+          <h2 className="section-label">chud logs</h2>
           <div className="panel about-panel">
-            <p><strong>what this is</strong>: chud starts with 1 SOL and learns by doing, live.</p>
-            <p><strong>home page</strong>: mood, wallet, live claw, chat, and balance chart.</p>
-            <p><strong>live trade feed</strong>: timeline of buys and sells with thesis text.</p>
-            <p><strong>powered by</strong>: openclaw runs the automation loop.</p>
+            <p><strong>live chud brain feed</strong>: what openclaw + chud are thinking and doing in real time.</p>
+            <p><strong>latest thought</strong>: {outbox.text ?? "no thought posted yet."}</p>
+            {outbox.at && <p><strong>thought time</strong>: {new Date(outbox.at).toLocaleString()}</p>}
+            <p><strong>live log stream</strong>:</p>
+            <div className="trade-feed trade-feed-rows">
+              {logs.map((l) => (
+                <div key={l.id} className="trade-feed-row">
+                  <div className="trade-feed-row-main">
+                    <div className="trade-feed-row-line1">
+                      <span className="trade-symbol">{l.type}</span>
+                      <span className="trade-feed-row-sep"> · </span>
+                      <span>{new Date(l.timestamp).toLocaleString()}</span>
+                    </div>
+                    <div className="trade-feed-row-why">{l.message}</div>
+                    {l.reason && <div className="trade-feed-row-why">chud note: {l.reason}</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
       )}

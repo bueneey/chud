@@ -206,6 +206,12 @@ export async function buy(params: BuyParams): Promise<{ ok: true; symbol: string
     const holderStats = hasBirdeyeApiKey() ? await getHolderStats(candidate.mint) : null;
     const why = params.reason?.trim() || fallbackBuyReason(candidate.symbol);
     recordOpenBuy(candidate.symbol, candidate.name, candidate.mint, why, amountSol, tokenAmount, buyTimestamp, txBuy, mcapUsd ?? undefined);
+    appendLog({
+      type: "bought",
+      symbol: candidate.symbol,
+      message: `[openclaw] buy $${candidate.symbol}`,
+      reason: why,
+    });
     emitBought(
       candidate.mint,
       candidate.symbol,
@@ -254,6 +260,12 @@ export async function sell(params?: { reason?: string }): Promise<
     const whySold = params?.reason?.trim() || "Agent exit";
     updateOpenTradeToSold(solReceived, open.buyTokenAmount, sellTimestamp, res.tx, mcapAtSellUsd ?? undefined, whySold, volumeAtSellUsd);
     const pnlSol = solReceived - open.buySol;
+    appendLog({
+      type: "sell",
+      symbol: open.symbol,
+      message: `[openclaw] sell $${open.symbol} (${pnlSol >= 0 ? "+" : ""}${pnlSol.toFixed(4)} SOL)`,
+      reason: whySold,
+    });
     emitSold(open.mint, open.symbol, pnlSol, res.tx);
     postChudTweetSell(open.symbol, pnlSol, whySold);
     return { ok: true, symbol: open.symbol, pnlSol, tx: res.tx };
