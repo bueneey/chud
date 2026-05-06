@@ -20,6 +20,18 @@
   box-sizing: border-box;
 }
 
+button,
+[role="button"],
+input[type="button"],
+input[type="submit"],
+input[type="reset"] {
+  cursor: pointer !important;
+}
+
+a {
+  cursor: pointer !important;
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -40,8 +52,12 @@ h2 { font-size: 0.95rem; color: var(--lobbi-orange); }
 a {
   color: var(--lobbi-orange);
   text-decoration: none;
+  transition: opacity 0.15s ease;
 }
-a:hover { text-decoration: underline; }
+a:hover {
+  text-decoration: underline;
+  opacity: 0.85;
+}
 
 .app-wrap {
   position: relative;
@@ -72,7 +88,13 @@ a:hover { text-decoration: underline; }
   background: var(--panel-subtle);
   color: var(--muted-on-surface);
   padding: 8px 12px;
-  cursor: pointer;
+  cursor: pointer !important;
+  transition: transform 0.12s ease, filter 0.12s ease;
+}
+
+.top-nav-btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(0.98);
 }
 
 .top-nav-btn.active {
@@ -744,7 +766,7 @@ a:hover { text-decoration: underline; }
   border: 1px solid var(--border);
   background: var(--lobbi-orange);
   color: #fff;
-  cursor: pointer;
+  cursor: pointer !important;
 }
 .coach-send:disabled {
   opacity: 0.55;
@@ -926,7 +948,7 @@ a:hover { text-decoration: underline; }
   background: var(--panel);
   border: 1px solid var(--border);
   padding: 6px 10px;
-  cursor: pointer;
+  cursor: pointer !important;
   border-radius: 6px;
   display: inline-flex;
   align-items: center;
@@ -950,6 +972,7 @@ a:hover { text-decoration: underline; }
   color: var(--muted-on-surface);
   padding: 4px;
   transition: color 0.2s;
+  cursor: pointer !important;
 }
 .social-link:hover {
   color: var(--lobbi-orange);

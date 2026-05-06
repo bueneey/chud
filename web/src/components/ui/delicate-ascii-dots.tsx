@@ -268,17 +268,17 @@ export default function DelicateAsciiDots({
     const handleResize = () => resizeCanvas();
 
     window.addEventListener("resize", handleResize);
-    canvas.addEventListener("mousemove", handleMouseMove as unknown as EventListener);
-    canvas.addEventListener("mousedown", handleMouseDown as unknown as EventListener);
-    canvas.addEventListener("mouseup", handleMouseUp as unknown as EventListener);
+    window.addEventListener("mousemove", handleMouseMove as unknown as EventListener);
+    window.addEventListener("mousedown", handleMouseDown as unknown as EventListener);
+    window.addEventListener("mouseup", handleMouseUp as unknown as EventListener);
 
     animate();
 
     return () => {
       window.removeEventListener("resize", handleResize);
-      canvas.removeEventListener("mousemove", handleMouseMove as unknown as EventListener);
-      canvas.removeEventListener("mousedown", handleMouseDown as unknown as EventListener);
-      canvas.removeEventListener("mouseup", handleMouseUp as unknown as EventListener);
+      window.removeEventListener("mousemove", handleMouseMove as unknown as EventListener);
+      window.removeEventListener("mousedown", handleMouseDown as unknown as EventListener);
+      window.removeEventListener("mouseup", handleMouseUp as unknown as EventListener);
 
       if (animationFrameId.current) {
         cancelAnimationFrame(animationFrameId.current);
@@ -299,6 +299,7 @@ export default function DelicateAsciiDots({
         width: "100%",
         height: "100%",
         zIndex: 0,
+        pointerEvents: "none",
       }}
     >
       <canvas
@@ -307,6 +308,7 @@ export default function DelicateAsciiDots({
           width: "100%",
           height: "100%",
           display: "block",
+          pointerEvents: "none",
         }}
       />
     </div>

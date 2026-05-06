@@ -56,16 +56,18 @@ export function ChudPanel({ chatMessages, chatLlmConfigured, onRefresh }: Props)
       {!chatLlmConfigured && (
         <p className="chud-chat-warn">chat is currently offline. configure chud chat in backend settings and restart.</p>
       )}
-      <div className="chat-thread" ref={threadRef} aria-label="talk to chud">
-        {chatMessages.map((m) => (
-          <div key={m.id} className={`chat-row ${m.role === "user" ? "chat-row-user" : "chat-row-chud"}`}>
-            <span className="chat-meta">{m.role === "user" ? "you" : "chud"} · {new Date(m.at).toLocaleString()}</span>
-            <div className={`chat-bubble ${m.role === "user" ? "chat-bubble-user" : "chat-bubble-chud"}`}>
-              <p>{m.content}</p>
+      {chatMessages.length > 0 && (
+        <div className="chat-thread" ref={threadRef} aria-label="talk to chud">
+          {chatMessages.map((m) => (
+            <div key={m.id} className={`chat-row ${m.role === "user" ? "chat-row-user" : "chat-row-chud"}`}>
+              <span className="chat-meta">{m.role === "user" ? "you" : "chud"} · {new Date(m.at).toLocaleString()}</span>
+              <div className={`chat-bubble ${m.role === "user" ? "chat-bubble-user" : "chat-bubble-chud"}`}>
+                <p>{m.content}</p>
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
       <form className="coach-form" onSubmit={sendChat}>
         <textarea
           className="coach-input chud-input"
