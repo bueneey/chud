@@ -131,14 +131,14 @@ export function WalletBalanceChart({ points, width = 800, height = 240 }: Props)
         {/* Area fill */}
         <path
           d={`${pathD} L ${x(points.length - 1)} ${y(minBal)} L ${x(0)} ${y(minBal)} Z`}
-          fill="var(--lobbi-orange)"
+          fill="var(--chud-accent)"
           fillOpacity={0.15}
         />
         {/* Line */}
         <path
           d={pathD}
           fill="none"
-          stroke="var(--lobbi-orange)"
+          stroke="var(--chud-accent)"
           strokeWidth={2.5}
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -150,7 +150,7 @@ export function WalletBalanceChart({ points, width = 800, height = 240 }: Props)
               cx={x(hover.index)}
               cy={y(hover.point.balanceSol)}
               r={6}
-              fill="var(--lobbi-orange)"
+              fill="var(--chud-accent)"
               stroke="var(--text)"
               strokeWidth={2}
             />

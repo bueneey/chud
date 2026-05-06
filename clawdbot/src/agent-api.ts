@@ -1,5 +1,5 @@
 /**
- * Agent API: used by the backend when Lobbi (running on OpenClaw) drives trading.
+ * Agent API: used by the backend when Chud (running on OpenClaw) drives trading.
  * One position at a time. Agent calls getCandidates → choose → buy(mint) → later sell().
  */
 import { config } from "dotenv";
@@ -12,7 +12,7 @@ const envPath = [join(root, ".env"), join(process.cwd(), ".env")].find((p) => ex
 if (envPath) config({ path: envPath });
 
 import type { CandidateCoin } from "./types.js";
-import { loadFilters, getLobbiOwnTokenMint } from "./config.js";
+import { loadFilters, getChudOwnTokenMint } from "./config.js";
 import { discoverCandidates } from "./discovery.js";
 import { executeBuy, executeSell, recordOpenBuy, getWalletBalanceSol } from "./trade.js";
 import {
@@ -58,7 +58,7 @@ function fallbackBuyReason(symbol: string): string {
 export async function getCandidates(): Promise<CandidateCoin[]> {
   const filters = loadFilters();
   const recent = new Set(getRecentMints(10));
-  const ownTokenMint = getLobbiOwnTokenMint();
+  const ownTokenMint = getChudOwnTokenMint();
   if (ownTokenMint) recent.add(ownTokenMint);
   const open = getOpenTrade();
   if (open?.mint) recent.add(open.mint);
@@ -166,7 +166,7 @@ export async function buy(params: BuyParams): Promise<{ ok: true; symbol: string
   if (open) {
     return { ok: false, error: `Already in position: ${open.symbol}. Sell first.` };
   }
-  const ownTokenMint = getLobbiOwnTokenMint();
+  const ownTokenMint = getChudOwnTokenMint();
   if (ownTokenMint && params.mint === ownTokenMint) {
     return { ok: false, error: "Cannot buy this token." };
   }
@@ -235,7 +235,7 @@ export async function sell(params?: { reason?: string }): Promise<
   if (!open) {
     return { ok: false, error: "No open position to sell." };
   }
-  const ownTokenMint = getLobbiOwnTokenMint();
+  const ownTokenMint = getChudOwnTokenMint();
   if (ownTokenMint && open.mint === ownTokenMint) {
     return { ok: false, error: "Cannot sell this position." };
   }

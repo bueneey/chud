@@ -1,7 +1,7 @@
 import { setState } from "./storage.js";
-import type { LobbiState, CandidateCoin } from "./types.js";
+import type { ChudState, CandidateCoin } from "./types.js";
 
-export function emitState(s: LobbiState): void {
+export function emitState(s: ChudState): void {
   setState({ ...s, at: new Date().toISOString() });
 }
 

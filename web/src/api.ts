@@ -52,10 +52,10 @@ export interface CandidateCoin {
   pairCreatedAt?: number;
 }
 
-export type LobbiStateKind = "idle" | "thinking" | "choosing" | "bought" | "sold";
+export type ChudStateKind = "idle" | "thinking" | "choosing" | "bought" | "sold";
 
-export interface LobbiState {
-  kind: LobbiStateKind;
+export interface ChudState {
+  kind: ChudStateKind;
   at: string;
   message?: string;
   candidateCoins?: CandidateCoin[];
@@ -102,8 +102,8 @@ export async function fetchBalanceChart(): Promise<{ points: BalanceChartPoint[]
   return { points: data.points ?? [] };
 }
 
-export async function fetchLobbiState(): Promise<LobbiState | null> {
-  const res = await apiFetch("/lobbi/state");
+export async function fetchChudState(): Promise<ChudState | null> {
+  const res = await apiFetch("/chud/state");
   const data = await res.json();
   return data;
 }

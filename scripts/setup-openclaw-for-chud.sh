@@ -5,21 +5,21 @@ set -euo pipefail
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 OPENCLAW_DIR="${OPENCLAW_HOME:-$HOME/.openclaw}"
 ENV_FILE="$OPENCLAW_DIR/.env"
-BASE_URL="${LOBBI_AGENT_BASE_URL:-http://127.0.0.1:4000}"
+BASE_URL="${CHUD_AGENT_BASE_URL:-http://127.0.0.1:4000}"
 
 mkdir -p "$OPENCLAW_DIR/workspace/skills"
 
 echo "== Chud ↔ OpenClaw setup =="
 
-if [[ -f "$ENV_FILE" ]] && grep -q '^[[:space:]]*LOBBI_AGENT_BASE_URL=' "$ENV_FILE" 2>/dev/null; then
-  if grep -q "^LOBBI_AGENT_BASE_URL=$BASE_URL" "$ENV_FILE" 2>/dev/null; then
-    echo "OK: $ENV_FILE already has LOBBI_AGENT_BASE_URL=$BASE_URL"
+if [[ -f "$ENV_FILE" ]] && grep -q '^[[:space:]]*CHUD_AGENT_BASE_URL=' "$ENV_FILE" 2>/dev/null; then
+  if grep -q "^CHUD_AGENT_BASE_URL=$BASE_URL" "$ENV_FILE" 2>/dev/null; then
+    echo "OK: $ENV_FILE already has CHUD_AGENT_BASE_URL=$BASE_URL"
   else
-    echo "Updating LOBBI_AGENT_BASE_URL in $ENV_FILE → $BASE_URL"
+    echo "Updating CHUD_AGENT_BASE_URL in $ENV_FILE → $BASE_URL"
     if command -v perl >/dev/null 2>&1; then
-      perl -i -pe "s|^[[:space:]]*LOBBI_AGENT_BASE_URL=.*|LOBBI_AGENT_BASE_URL=$BASE_URL|" "$ENV_FILE"
+      perl -i -pe "s|^[[:space:]]*CHUD_AGENT_BASE_URL=.*|CHUD_AGENT_BASE_URL=$BASE_URL|" "$ENV_FILE"
     else
-      echo "Install perl or edit $ENV_FILE by hand: LOBBI_AGENT_BASE_URL=$BASE_URL"
+      echo "Install perl or edit $ENV_FILE by hand: CHUD_AGENT_BASE_URL=$BASE_URL"
     fi
   fi
 else
@@ -27,7 +27,7 @@ else
   {
     echo ""
     echo "# Chud the Trader — agent HTTP API (added by setup-openclaw-for-chud.sh)"
-    echo "LOBBI_AGENT_BASE_URL=$BASE_URL"
+    echo "CHUD_AGENT_BASE_URL=$BASE_URL"
   } >>"$ENV_FILE"
 fi
 

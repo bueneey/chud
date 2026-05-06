@@ -260,8 +260,8 @@ ${context.slice(0, 1200)}`;
   return t;
 }
 
-/** @deprecated name — same as askChudShouldSell without learning block (avoid). */
-export async function askLobbiShouldSell(
+/** @deprecated legacy alias — same as askChudShouldSell without learning block (avoid). */
+export async function askChudShouldSellLegacy(
   symbol: string,
   whyBought: string,
   quote: PositionQuote

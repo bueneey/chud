@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import type { LobbiState, TradeRecord } from "./api";
+import type { ChudState, TradeRecord } from "./api";
 
 /** Strip DexScreener/chart URLs from text. */
 function stripUrls(text: string): string {
@@ -7,7 +7,7 @@ function stripUrls(text: string): string {
 }
 
 interface Props {
-  state: LobbiState | null;
+  state: ChudState | null;
   trades: TradeRecord[];
   isHappy: boolean;
 }
@@ -16,7 +16,7 @@ function getOpenTrade(trades: TradeRecord[]): TradeRecord | null {
   return trades.find((t) => !t.sellTimestamp || t.sellTimestamp === "") ?? null;
 }
 
-export function LobbiScene({ state, trades, isHappy }: Props) {
+export function ChudScene({ state, trades, isHappy }: Props) {
   const [copiedMint, setCopiedMint] = useState(false);
   const kind = state?.kind ?? "idle";
   const message = state?.message ?? "";
@@ -38,15 +38,15 @@ export function LobbiScene({ state, trades, isHappy }: Props) {
   const showSelecting = (searching || kind === "sold") && !hasPosition;
 
   return (
-    <div className="panel lobbi-scene">
+    <div className="panel chud-scene">
       <div className="panel-title">[ live claw ]</div>
-      <div className="lobbi-status-bar">
+      <div className="chud-status-bar">
         {(searching || kind === "sold") && !openTrade && (
-          <span className="lobbi-status">
+          <span className="chud-status">
             {kind === "sold" ? "position closed · selecting next coin…" : "no position · selecting next coin…"}
           </span>
         )}
-        {hasPosition && <span className="lobbi-status lobbi-status-position">in position: {effectiveSymbol}</span>}
+        {hasPosition && <span className="chud-status chud-status-position">in position: {effectiveSymbol}</span>}
       </div>
 
       {(kind === "thinking" || kind === "choosing") && (
@@ -55,7 +55,7 @@ export function LobbiScene({ state, trades, isHappy }: Props) {
         </div>
       )}
 
-      <div className="lobbi-claw-and-sprite">
+      <div className="chud-claw-and-sprite">
         <div className="screens-row screens-row-single">
           <div className={`ascii-screen ${hasPosition ? "selected" : ""}`}>
             <div className="screen-frame">
@@ -107,11 +107,11 @@ export function LobbiScene({ state, trades, isHappy }: Props) {
             </div>
           </div>
         </div>
-        <div className="lobbi-sprite-container" aria-hidden>
+        <div className="chud-sprite-container" aria-hidden>
           <img
             src={isHappy ? "/chudhappy.png" : "/chudpfptbg.png"}
             alt="Chud the Trader"
-            className={`lobbi-sprite ${hasPosition ? "bought" : kind}`}
+            className={`chud-sprite ${hasPosition ? "bought" : kind}`}
           />
         </div>
       </div>

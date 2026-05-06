@@ -93,10 +93,10 @@ export interface CandidateCoin {
   pairCreatedAt?: number;
 }
 
-export type LobbiStateKind = "idle" | "thinking" | "choosing" | "bought" | "sold";
+export type ChudStateKind = "idle" | "thinking" | "choosing" | "bought" | "sold";
 
-export interface LobbiState {
-  kind: LobbiStateKind;
+export interface ChudState {
+  kind: ChudStateKind;
   at: string;
   message?: string;
   candidateCoins?: CandidateCoin[];
@@ -112,8 +112,8 @@ export function getTrades(): TradeRecord[] {
   return readJson<TradeRecord[]>(TRADES_FILE, []);
 }
 
-export function getState(): LobbiState | null {
-  return readJson<LobbiState | null>(STATE_FILE, null);
+export function getState(): ChudState | null {
+  return readJson<ChudState | null>(STATE_FILE, null);
 }
 
 export interface LogEntry {

@@ -4,19 +4,19 @@ import {
   fetchBalance,
   fetchPnl,
   fetchBalanceChart,
-  fetchLobbiState,
+  fetchChudState,
   fetchChudChat,
   fetchLogs,
   fetchChudOutbox,
   type TradeRecord,
-  type LobbiState,
+  type ChudState,
   type BalanceChartPoint,
   type ChudChatTurn,
   type LogEntry,
   type ChudOutboxResponse,
 } from "./api";
 import { ChudPanel } from "./ChudPanel";
-import { LobbiScene } from "./LobbiScene";
+import { ChudScene } from "./ChudScene";
 import { TradeFeed } from "./TradeFeed";
 import { WalletBalanceChart } from "./WalletBalanceChart";
 import DelicateAsciiDots from "./components/ui/delicate-ascii-dots";
@@ -34,7 +34,7 @@ export default function App() {
   const [balance, setBalance] = useState<number>(0);
   const [pnl, setPnl] = useState<number>(0);
   const [balanceChartPoints, setBalanceChartPoints] = useState<BalanceChartPoint[]>([]);
-  const [state, setState] = useState<LobbiState | null>(null);
+  const [state, setState] = useState<ChudState | null>(null);
   const [chatMessages, setChatMessages] = useState<ChudChatTurn[]>([]);
   const [chatLlmConfigured, setChatLlmConfigured] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -59,7 +59,7 @@ export default function App() {
       fetchBalance(),
       fetchPnl(),
       fetchBalanceChart(),
-      fetchLobbiState(),
+      fetchChudState(),
       fetchChudChat().catch(() => ({ messages: [] as ChudChatTurn[], llmConfigured: false })),
       fetchLogs(200).catch(() => [] as LogEntry[]),
       fetchChudOutbox(),
@@ -195,7 +195,7 @@ export default function App() {
         <p className="section-desc">
           live view of what chud is scanning, holding, or exiting.
         </p>
-        <LobbiScene state={state} trades={trades} isHappy={isHappy} />
+        <ChudScene state={state} trades={trades} isHappy={isHappy} />
       </section>
 
       <section className="coach-section" aria-label="talk to chud">

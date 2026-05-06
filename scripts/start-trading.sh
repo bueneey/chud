@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Start LOBBI with one website + clawbot trading. Kills stale processes and removes lock.
+# Start Chud with one website + clawbot trading. Kills stale processes and removes lock.
 set -e
 cd "$(dirname "$0")/.."
 echo "==> Stopping any existing processes..."
-pkill -9 -f "lobbi" 2>/dev/null || true
+pkill -9 -f "chud" 2>/dev/null || true
 pkill -9 -f "clawdbot" 2>/dev/null || true
 pkill -9 -f "tsx watch" 2>/dev/null || true
 pkill -9 -f "vite" 2>/dev/null || true

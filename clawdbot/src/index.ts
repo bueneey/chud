@@ -7,7 +7,7 @@ const envPath = [
   join(process.cwd(), "..", "..", ".env"),
 ].find((p) => existsSync(p));
 if (envPath) config({ path: envPath });
-import { loadFilters, getDataDir, DEMO_MODE, getLobbiOwnTokenMint } from "./config.js";
+import { loadFilters, getDataDir, DEMO_MODE, getChudOwnTokenMint } from "./config.js";
 import {
   setState,
   getOpenTrade,
@@ -37,7 +37,7 @@ import { askChudShouldSell, askChudPickCandidate } from "./llm.js";
 import { anyChudLlmConfigured } from "./llm-provider-order.js";
 import { postChudTweetBuy, postChudTweetSell, isXPostingConfigured, describeXPosting } from "./x-post.js";
 import { maybeStartThoughtPosting } from "./thought-post.js";
-import type { CandidateCoin, HoldPlan, LobbiState } from "./types.js";
+import type { CandidateCoin, HoldPlan, ChudState } from "./types.js";
 
 /**
  * How often to ask Claude “sell or hold?” while you have a position open.
@@ -77,7 +77,7 @@ async function holdAndSell(
       "[Chud] No LLM keys and CHUD_FORCE_SELL_AFTER_MINUTES is 0 — this position will never auto-exit. Add keys or set e.g. CHUD_FORCE_SELL_AFTER_MINUTES=120."
     );
   }
-  const ownTokenMint = getLobbiOwnTokenMint();
+  const ownTokenMint = getChudOwnTokenMint();
 
   while (true) {
     await sleep(HOLD_POLL_MS);
@@ -195,7 +195,7 @@ async function runCycleBody(): Promise<void> {
       chosenSymbol: open.symbol,
       chosenMcapUsd: open.mcapUsd,
       chosenReason: open.why,
-    } as LobbiState);
+    } as ChudState);
     const resumePlan: HoldPlan = {
       holdMinMs: filters.holdMinSeconds * 1000,
       holdMaxMs: filters.holdMaxSeconds * 1000,
@@ -222,7 +222,7 @@ async function runCycleBody(): Promise<void> {
   await sleep(3000);
 
   const recentMints = new Set(getRecentMints(10));
-  const ownTokenMint = getLobbiOwnTokenMint();
+  const ownTokenMint = getChudOwnTokenMint();
   if (ownTokenMint) recentMints.add(ownTokenMint);
   const openMint = getOpenTrade()?.mint;
   if (openMint) recentMints.add(openMint);
@@ -403,10 +403,10 @@ export async function startTradingLoop(): Promise<never> {
       chosenSymbol: open.symbol,
       chosenMcapUsd: open.mcapUsd,
       chosenReason: open.why,
-    } as LobbiState);
+    } as ChudState);
     console.log("[Clawdbot] Resuming open position:", open.symbol);
   } else {
-    setState({ kind: "idle", at: new Date().toISOString() } as LobbiState);
+    setState({ kind: "idle", at: new Date().toISOString() } as ChudState);
   }
 
   while (true) {

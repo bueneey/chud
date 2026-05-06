@@ -9,7 +9,7 @@
   --muted: #5a6358;
   --muted-on-surface: #3d453c;
   --accent: #4a6b42;
-  --lobbi-orange: #4d7344;
+  --chud-accent: #4d7344;
   --green: #3d6b3d;
   --red: #a84848;
   --pixel-font: "Press Start 2P", cursive;
@@ -47,10 +47,10 @@ h1, h2, .pixel {
 }
 
 h1 { font-size: 1.25rem; color: var(--text); }
-h2 { font-size: 0.95rem; color: var(--lobbi-orange); }
+h2 { font-size: 0.95rem; color: var(--chud-accent); }
 
 a {
-  color: var(--lobbi-orange);
+  color: var(--chud-accent);
   text-decoration: none;
   transition: opacity 0.15s ease;
 }
@@ -98,9 +98,9 @@ a:hover {
 }
 
 .top-nav-btn.active {
-  background: var(--lobbi-orange);
+  background: var(--chud-accent);
   color: #fff;
-  border-color: var(--lobbi-orange);
+  border-color: var(--chud-accent);
 }
 
 .app-cursor-trail {
@@ -140,23 +140,23 @@ a:hover {
 }
 
 /* Live claw / chud scene */
-.lobbi-status-bar {
+.chud-status-bar {
   margin-bottom: 12px;
   font-size: 0.9rem;
   text-align: center;
   width: 100%;
 }
 
-.lobbi-status {
+.chud-status {
   color: var(--muted);
 }
 
-.lobbi-status-position {
-  color: var(--lobbi-orange);
+.chud-status-position {
+  color: var(--chud-accent);
   font-weight: 600;
 }
 
-.lobbi-scene {
+.chud-scene {
   min-height: 200px;
   display: flex;
   flex-direction: column;
@@ -169,12 +169,12 @@ a:hover {
   margin-right: auto;
 }
 
-.lobbi-scene .panel-title {
+.chud-scene .panel-title {
   text-align: center;
   width: 100%;
 }
 
-.lobbi-claw-and-sprite {
+.chud-claw-and-sprite {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -183,7 +183,7 @@ a:hover {
   width: 100%;
 }
 
-.lobbi-sprite-container {
+.chud-sprite-container {
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -243,7 +243,7 @@ a:hover {
 }
 
 .ascii-screen.selected .screen-frame {
-  border-color: var(--lobbi-orange);
+  border-color: var(--chud-accent);
   box-shadow: 0 0 0 2px rgba(107, 143, 98, 0.35);
 }
 
@@ -268,7 +268,7 @@ a:hover {
 
 .screen-symbol {
   font-family: var(--pixel-font);
-  color: var(--lobbi-orange);
+  color: var(--chud-accent);
   font-size: 0.65rem;
   margin-bottom: 2px;
 }
@@ -308,8 +308,8 @@ a:hover {
 }
 
 .screen-ca-btn:hover {
-  color: var(--lobbi-orange);
-  border-color: var(--lobbi-orange);
+  color: var(--chud-accent);
+  border-color: var(--chud-accent);
 }
 
 .screen-empty {
@@ -317,32 +317,32 @@ a:hover {
   font-size: 0.9rem;
 }
 
-.lobbi-sprite {
+.chud-sprite {
   width: 120px;
   height: auto;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   transition: transform 0.3s ease;
-  animation: lobbi-float 2.8s ease-in-out infinite;
+  animation: chud-float 2.8s ease-in-out infinite;
 }
 
-.lobbi-sprite-container:hover .lobbi-sprite {
-  animation: lobbi-float 1s ease-in-out infinite;
+.chud-sprite-container:hover .chud-sprite {
+  animation: chud-float 1s ease-in-out infinite;
 }
 
-.lobbi-sprite.thinking {
-  animation: lobbi-float 2s ease-in-out infinite;
+.chud-sprite.thinking {
+  animation: chud-float 2s ease-in-out infinite;
 }
 
-.lobbi-sprite.choosing {
-  animation: lobbi-float 1.5s ease-in-out infinite;
+.chud-sprite.choosing {
+  animation: chud-float 1.5s ease-in-out infinite;
 }
 
-.lobbi-sprite.bought {
-  animation: lobbi-float 2.2s ease-in-out infinite;
+.chud-sprite.bought {
+  animation: chud-float 2.2s ease-in-out infinite;
 }
 
-@keyframes lobbi-float {
+@keyframes chud-float {
   0%, 100% { transform: translateY(0) rotate(-2deg); }
   25% { transform: translateY(-10px) rotate(1deg); }
   50% { transform: translateY(-16px) rotate(-1deg); }
@@ -438,7 +438,7 @@ a:hover {
 }
 
 .trade-feed-row-buy {
-  border-left: 4px solid var(--lobbi-orange);
+  border-left: 4px solid var(--chud-accent);
   background: rgba(107, 143, 98, 0.1);
 }
 
@@ -481,7 +481,7 @@ a:hover {
 
 .trade-feed-row-sep { color: var(--muted); }
 .trade-feed-row-mcap { font-size: 0.85rem; color: var(--muted); }
-.trade-symbol { color: var(--lobbi-orange); font-weight: bold; }
+.trade-symbol { color: var(--chud-accent); font-weight: bold; }
 .trade-feed-row-sol { font-family: var(--pixel-font); }
 .trade-feed-row-pnl { font-weight: bold; }
 .trade-feed-row-pnl.positive { color: var(--green); }
@@ -500,7 +500,7 @@ a:hover {
 }
 
 .trade-mint-btn-inline:hover {
-  color: var(--lobbi-orange);
+  color: var(--chud-accent);
   background: rgba(107, 143, 98, 0.15);
 }
 
@@ -509,7 +509,7 @@ a:hover {
   align-items: center;
   font-size: 0.9rem;
   font-weight: 600;
-  color: var(--lobbi-orange);
+  color: var(--chud-accent);
   padding: 4px 10px;
   margin-left: 8px;
   background: rgba(107, 143, 98, 0.18);
@@ -539,7 +539,7 @@ a:hover {
 .stat-value {
   font-family: var(--pixel-font);
   font-size: 0.8rem;
-  color: var(--lobbi-orange);
+  color: var(--chud-accent);
 }
 
 /* Header */
@@ -570,7 +570,7 @@ a:hover {
 
 .header h1 {
   margin: 0 0 4px 0;
-  color: var(--lobbi-orange);
+  color: var(--chud-accent);
 }
 .header-sub {
   display: block;
@@ -589,7 +589,7 @@ a:hover {
 
 .section-label {
   font-size: 0.85rem;
-  color: var(--lobbi-orange);
+  color: var(--chud-accent);
   margin: 0 0 6px 0;
   font-family: var(--pixel-font);
   letter-spacing: 0.5px;
@@ -632,9 +632,9 @@ a:hover {
   cursor: pointer;
 }
 .chud-tab.active {
-  background: var(--lobbi-orange);
+  background: var(--chud-accent);
   color: #fff;
-  border-color: var(--lobbi-orange);
+  border-color: var(--chud-accent);
 }
 
 .chat-thread {
@@ -764,7 +764,7 @@ a:hover {
   padding: 10px 16px;
   border-radius: 8px;
   border: 1px solid var(--border);
-  background: var(--lobbi-orange);
+  background: var(--chud-accent);
   color: #fff;
   cursor: pointer !important;
 }
@@ -867,7 +867,7 @@ a:hover {
 }
 .logs-row.log-buy { border-left-color: var(--green); background: rgba(122, 171, 122, 0.1); }
 .logs-row.log-sell { border-left-color: var(--red); background: rgba(201, 107, 107, 0.1); }
-.logs-row.log-hold { border-left-color: var(--lobbi-orange); background: rgba(107, 143, 98, 0.1); }
+.logs-row.log-hold { border-left-color: var(--chud-accent); background: rgba(107, 143, 98, 0.1); }
 .logs-row.log-error { border-left-color: var(--red); }
 .logs-badge {
   font-family: var(--pixel-font);
@@ -916,7 +916,7 @@ a:hover {
   transform: translateX(-50%);
   background: var(--panel);
   color: var(--text);
-  border: 2px solid var(--lobbi-orange);
+  border: 2px solid var(--chud-accent);
   border-radius: 8px;
   padding: 10px 16px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
@@ -926,7 +926,7 @@ a:hover {
 .balance-chart-tooltip-balance {
   font-family: var(--pixel-font);
   font-size: 0.8rem;
-  color: var(--lobbi-orange);
+  color: var(--chud-accent);
 }
 .balance-chart-tooltip-time {
   font-size: 0.75rem;
@@ -955,8 +955,8 @@ a:hover {
   gap: 2px;
 }
 .ca-button:hover {
-  color: var(--lobbi-orange);
-  border-color: var(--lobbi-orange);
+  color: var(--chud-accent);
+  border-color: var(--chud-accent);
 }
 .ca-label { text-transform: lowercase; }
 .ca-address { font-family: monospace; font-size: 0.75rem; }
@@ -975,7 +975,7 @@ a:hover {
   cursor: pointer !important;
 }
 .social-link:hover {
-  color: var(--lobbi-orange);
+  color: var(--chud-accent);
 }
 
 .footer {
@@ -1009,7 +1009,7 @@ a:hover {
   text-decoration: underline;
 }
 .footer a:hover {
-  color: var(--lobbi-orange);
+  color: var(--chud-accent);
 }
 
 /* OpenClaw tape (position + outbox) */
@@ -1049,7 +1049,7 @@ a:hover {
   font-family: var(--pixel-font);
   font-size: 0.75rem;
   margin: 0 0 8px 0;
-  color: var(--lobbi-orange);
+  color: var(--chud-accent);
 }
 .agent-tape-stats {
   margin: 0 0 12px 0;

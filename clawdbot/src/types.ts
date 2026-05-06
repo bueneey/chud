@@ -70,10 +70,10 @@ export interface TradeRecord {
   txSell?: string;
 }
 
-export type LobbiStateKind = "idle" | "thinking" | "choosing" | "bought" | "sold";
+export type ChudStateKind = "idle" | "thinking" | "choosing" | "bought" | "sold";
 
-export interface LobbiState {
-  kind: LobbiStateKind;
+export interface ChudState {
+  kind: ChudStateKind;
   at: string;
   message?: string;
   candidateCoins?: CandidateCoin[];

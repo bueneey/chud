@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Run while Chud backend is up: npm run dev (from repo root).
 set -euo pipefail
-BASE="${LOBBI_AGENT_BASE_URL:-http://127.0.0.1:4000}"
+BASE="${CHUD_AGENT_BASE_URL:-http://127.0.0.1:4000}"
 echo "==> $BASE/api/agent/info"
 curl -sS "$BASE/api/agent/info" | head -c 600
 echo

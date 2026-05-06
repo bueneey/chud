@@ -88,7 +88,7 @@ app.get("/api/balance/chart", async (_req, res) => {
   res.json({ points });
 });
 
-app.get("/api/lobbi/state", (_req, res) => {
+app.get("/api/chud/state", (_req, res) => {
   const state = getState();
   res.json(state ?? { kind: "idle", at: new Date().toISOString() });
 });
@@ -138,7 +138,7 @@ app.get("/api/wallet-status", async (_req, res) => {
   }
 });
 
-const LOBBI_AGENT_BASE = process.env.LOBBI_AGENT_BASE_URL || "http://localhost:4000";
+const CHUD_AGENT_BASE = process.env.CHUD_AGENT_BASE_URL || "http://localhost:4000";
 
 app.get("/api/agent/candidates", async (_req, res) => {
   try {
@@ -302,14 +302,14 @@ app.get("/api/agent/info", (_req, res) => {
   res.json({
     message:
       "Chud agent API. GET candidates, position. POST buy / sell. POST force-close (CHUD_FORCE_CLOSE_SECRET). Sells retry pools: auto,raydium,pump-amm,raydium-cpmm,launchlab,bonk,pump (CHUD_SELL_POOL_FALLBACKS).",
-    baseUrl: LOBBI_AGENT_BASE,
+    baseUrl: CHUD_AGENT_BASE,
     endpoints: {
-      candidates: `${LOBBI_AGENT_BASE}/api/agent/candidates`,
-      position: `${LOBBI_AGENT_BASE}/api/agent/position`,
-      buy: `${LOBBI_AGENT_BASE}/api/agent/buy`,
-      sell: `${LOBBI_AGENT_BASE}/api/agent/sell`,
-      forceClose: `${LOBBI_AGENT_BASE}/api/agent/force-close`,
-      chudOutbox: `${LOBBI_AGENT_BASE}/api/chud/outbox`,
+      candidates: `${CHUD_AGENT_BASE}/api/agent/candidates`,
+      position: `${CHUD_AGENT_BASE}/api/agent/position`,
+      buy: `${CHUD_AGENT_BASE}/api/agent/buy`,
+      sell: `${CHUD_AGENT_BASE}/api/agent/sell`,
+      forceClose: `${CHUD_AGENT_BASE}/api/agent/force-close`,
+      chudOutbox: `${CHUD_AGENT_BASE}/api/chud/outbox`,
     },
   });
 });

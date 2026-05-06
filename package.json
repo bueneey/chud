@@ -1,5 +1,5 @@
 {
-  "name": "lobbi",
+  "name": "chud",
   "private": true,
   "scripts": {
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:web\"",

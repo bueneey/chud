@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync, readFileSync, existsSync, unlinkSync } from "fs";
 import { join } from "path";
-import type { TradeRecord, LobbiState } from "./types.js";
+import type { TradeRecord, ChudState } from "./types.js";
 import { getDataDir } from "./config.js";
 
 function dataPath(file: string): string {
@@ -17,7 +17,7 @@ const MAX_LOGS = 300;
 const LOCK_MAX_AGE_MS = 15 * 60 * 1000;
 
 let tradesCache: TradeRecord[] = [];
-let stateCache: LobbiState | null = null;
+let stateCache: ChudState | null = null;
 
 function loadTrades(): TradeRecord[] {
   const p = dataPath(TRADES_FILE);
@@ -49,7 +49,7 @@ function dedupeOpenTrades(trades: TradeRecord[]): TradeRecord[] {
   return out;
 }
 
-function loadState(): LobbiState | null {
+function loadState(): ChudState | null {
   const p = dataPath(STATE_FILE);
   if (!existsSync(p)) return null;
   try {
@@ -170,12 +170,12 @@ export function forceCloseOpenTrade(whySold: string): { ok: true; symbol: string
   return { ok: true, symbol: open.symbol, mint: open.mint };
 }
 
-export function getState(): LobbiState | null {
+export function getState(): ChudState | null {
   stateCache = loadState();
   return stateCache;
 }
 
-export function setState(s: LobbiState): void {
+export function setState(s: ChudState): void {
   writeFileSync(dataPath(STATE_FILE), JSON.stringify(s, null, 2));
   stateCache = s;
 }
