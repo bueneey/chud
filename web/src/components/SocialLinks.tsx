@@ -1,4 +1,4 @@
-export const GITHUB_URL = "https://github.com/oubadam/chud-the-trader";
+export const GITHUB_URL = "https://github.com/bueneey/chud";
 export const X_URL = "https://x.com/chudthetrader";
 
 export function SocialLinks() {

@@ -27,7 +27,6 @@ import {
 import { emitBought, emitSold, emitIdle } from "./state.js";
 import { postChudTweetBuy, postChudTweetSell } from "./x-post.js";
 import { getTokenPriceUsd, getTokenMcapUsd, getTokenStats } from "./price.js";
-import { planHold } from "./analysis.js";
 import { getHolderStats, hasBirdeyeApiKey } from "./birdeye.js";
 
 export interface AgentPosition {
@@ -50,6 +49,10 @@ export interface BuyParams {
   name: string;
   reason?: string;
   amountSol?: number;
+}
+
+function fallbackBuyReason(symbol: string): string {
+  return `uhh i bought $${symbol} because it looked funny and my brain said yes`;
 }
 
 export async function getCandidates(): Promise<CandidateCoin[]> {
@@ -201,8 +204,7 @@ export async function buy(params: BuyParams): Promise<{ ok: true; symbol: string
     const buyTimestamp = new Date().toISOString();
     const mcapUsd = await getTokenMcapUsd(candidate.mint).catch(() => undefined);
     const holderStats = hasBirdeyeApiKey() ? await getHolderStats(candidate.mint) : null;
-    const plan = planHold(candidate, filters, holderStats ?? undefined);
-    const why = (params.reason ?? "agent") + " | hold: " + plan.reason;
+    const why = params.reason?.trim() || fallbackBuyReason(candidate.symbol);
     recordOpenBuy(candidate.symbol, candidate.name, candidate.mint, why, amountSol, tokenAmount, buyTimestamp, txBuy, mcapUsd ?? undefined);
     emitBought(
       candidate.mint,

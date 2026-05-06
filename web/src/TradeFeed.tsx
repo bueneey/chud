@@ -47,10 +47,6 @@ export function TradeFeed({ trades }: Props) {
     return (
       <div className="panel">
         <div className="panel-title">[ trade feed — live ]</div>
-        <p className="trade-feed-desc">
-          every buy and sell as it happens; when there is text, you will see why we bought / why we sold (openclaw{" "}
-          reasons land here too). refreshes every 3s.
-        </p>
         <div className="trade-feed">
           <p className="trade-feed-empty">no trades yet. when chud buys, a buy row will appear; when he sells, a sell row will appear.</p>
         </div>
@@ -61,9 +57,6 @@ export function TradeFeed({ trades }: Props) {
   return (
     <div className="panel">
       <div className="panel-title">[ trade feed — live ]</div>
-      <p className="trade-feed-desc">
-        every buy and sell in time order; thesis lines (why / why sold) show when present. refreshes every 3s.
-      </p>
       <div className="trade-feed trade-feed-rows">
         {events.map((ev, i) => (
           <div key={ev.type + ev.trade.id + ev.timestamp + i} className={`trade-feed-row trade-feed-row-${ev.type}`}>
@@ -71,30 +64,8 @@ export function TradeFeed({ trades }: Props) {
             <div className="trade-feed-row-main">
               <div className="trade-feed-row-line1">
                 <span className="trade-symbol">{ev.trade.symbol}</span>
-                {ev.type === "buy" && ev.trade.mcapUsd != null && (
-                  <span className="trade-feed-row-mcap"> · mcap @ buy ${(ev.trade.mcapUsd / 1000).toFixed(1)}k</span>
-                )}
-                {ev.type === "buy" && ev.trade.volumeAtBuyUsd != null && (
-                  <span> · vol @ buy ${(ev.trade.volumeAtBuyUsd / 1000).toFixed(1)}k</span>
-                )}
-                {ev.type === "buy" && ev.trade.ageMinutesAtBuy != null && (
-                  <span> · Token was {ev.trade.ageMinutesAtBuy}m old at buy</span>
-                )}
                 {ev.type === "buy" && !ev.trade.sellTimestamp && (
                   <span> · Holding {Math.floor((Date.now() - new Date(ev.trade.buyTimestamp).getTime()) / 60000)}m</span>
-                )}
-                {ev.type === "sell" && (
-                  <>
-                    {ev.trade.mcapAtSellUsd != null && (
-                      <span className="trade-feed-row-mcap"> · mcap @ sell ${(ev.trade.mcapAtSellUsd / 1000).toFixed(1)}k</span>
-                    )}
-                    {ev.trade.volumeAtSellUsd != null && (
-                      <span> · vol @ sell ${(ev.trade.volumeAtSellUsd / 1000).toFixed(1)}k</span>
-                    )}
-                    {ev.trade.ageMinutesAtSell != null && (
-                      <span> · Token was {ev.trade.ageMinutesAtSell}m old at sell</span>
-                    )}
-                  </>
                 )}
                 <span className="trade-feed-row-sep"> · </span>
                 {ev.type === "buy" ? (

@@ -89,87 +89,47 @@ function pick<T>(options: T[], seed: string): T {
   return options[h % options.length]!;
 }
 
-/** Build a unique, coin-specific "why bought" narrative. Varied phrasing based on actual metrics. */
+/** Build a unique, coin-specific "why bought" narrative in chud voice. */
 export function buildNarrativeWhy(
   coin: CandidateCoin,
   plan: HoldPlan,
   holderStats?: HolderStats | null,
   ageMinutes?: number
 ): string {
-  const name = coin.name || coin.symbol || "Unknown";
-  const mcap = coin.mcapUsd ?? 0;
-  const vol = coin.volumeUsd ?? 0;
-  const mcapK = (mcap / 1000).toFixed(1);
-  const volK = (vol / 1000).toFixed(1);
   const seed = coin.mint + coin.symbol;
+  const sym = coin.symbol || "???";
+  const name = coin.name || sym;
 
-  const openings = [
-    `${name} ($${coin.symbol}) — `,
-    `$${coin.symbol} — `,
-    `${name} — `,
+  const openers = [
+    `bought $${sym} because the ticker felt illegal and i respected that.`,
+    `aped $${sym}. ${name} looked like chaos and i am professionally unqualified.`,
+    `took $${sym} because my inner risk manager is a goldfish.`,
+    `entered $${sym}. i had a vision and zero evidence.`,
   ];
-  let s = "Bought " + pick(openings, seed);
-
-  if (mcap > 0 && vol > 0) {
-    const velocity = vol / mcap;
-    const velPhrases: string[] =
-      velocity > 2
-        ? [
-            `Unusual ${velocity.toFixed(1)}x vol/mcap ($${volK}k / $${mcapK}k)—strong momentum.`,
-            `Vol $${(vol / 1000).toFixed(0)}k crushes mcap $${mcapK}k (${velocity.toFixed(1)}x)—real interest.`,
-          ]
-        : velocity > 0.8
-          ? [
-              `Vol $${volK}k vs mcap $${mcapK}k (${velocity.toFixed(1)}x)—healthy trading activity.`,
-              `$${volK}k volume on $${mcapK}k mcap—decent velocity and interest.`,
-            ]
-          : velocity > 0.3
-            ? [
-                `$${volK}k vol, $${mcapK}k mcap—solid ratio.`,
-                `Volume and mcap in line: $${volK}k / $${mcapK}k.`,
-              ]
-            : [
-                `Lower vol ($${volK}k) for $${mcapK}k mcap—speculative play.`,
-                `$${mcapK}k mcap, $${volK}k vol—early stage.`,
-              ];
-    s += pick(velPhrases, seed + "v");
-  } else if (mcap > 0) {
-    s += `Mcap $${mcapK}k. `;
-  }
-
+  const middle = [
+    "if this sends, i am a genius. if it nukes, it was tuition.",
+    "this is either a masterclass or a police report.",
+    "i call this setup: confident nonsense with a stop button.",
+    "my thesis is vibes, timing, and a little bit of delusion.",
+  ];
+  const closer: string[] = [];
   if (ageMinutes != null) {
-    const agePhrases: string[] =
-      ageMinutes < 5
-        ? [`Fresh: ${ageMinutes}m old. `, `Very new: ${ageMinutes}m. `]
-        : ageMinutes < 20
-          ? [`${ageMinutes}m old—early entry. `, `Age ${ageMinutes}m. `]
-          : ageMinutes < 45
-            ? [`${ageMinutes}m in—momentum phase. `, `Token ${ageMinutes}m old. `]
-            : [`${ageMinutes}m old. `];
-    s += pick(agePhrases, seed + "a");
+    closer.push(
+      ageMinutes < 10
+        ? `coin is fresh (${ageMinutes}m old), so we are early or we are cooked.`
+        : `coin is ${ageMinutes}m old, so i am either right on time or late with confidence.`
+    );
   }
-
   if (holderStats) {
-    const h = holderStats.holderCount;
-    const t10 = holderStats.top10PercentOfSupply.toFixed(0);
-    const holderPhrases: string[] = holderStats.isGoodHolders
-      ? [
-          `${h} holders, top 10 = ${t10}%—distributed. `,
-          `Good distribution: ${h} holders, ${t10}% in top 10. `,
-        ]
-      : [
-          `${h} holders, top 10 hold ${t10}%. `,
-          `Holder base: ${h}, top 10 = ${t10}%. `,
-        ];
-    s += pick(holderPhrases, seed + "h");
+    closer.push(
+      holderStats.isGoodHolders
+        ? `holder spread looks decent, so at least i am not alone in this bad idea.`
+        : `holder spread is sketchy, so i am sizing this like i enjoy sleep.`
+    );
+  }
+  if (plan.reason && plan.reason !== "default") {
+    closer.push(`risk brain says: ${plan.reason}. vibes brain said buy anyway.`);
   }
 
-  if (coin.twitter || coin.website) {
-    const links: string[] = [];
-    if (coin.twitter) links.push(coin.twitter);
-    if (coin.website) links.push(coin.website);
-    s += `Socials: ${links.join(", ")}. `;
-  }
-
-  return s.trim();
+  return [pick(openers, seed), pick(middle, seed + "m"), ...closer].join(" ").trim();
 }

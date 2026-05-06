@@ -179,14 +179,6 @@ export default function App() {
         </div>
       </section>
 
-      <section className="feed-section" aria-label="live trade feed">
-        <h2 className="section-label">live trade feed</h2>
-        <p className="section-desc">
-          every buy and sell in time order, with why bought and why sold when available.
-        </p>
-        <TradeFeed trades={trades} />
-      </section>
-
       <section className="claw-section" aria-label="live claw">
         <h2 className="section-label">live claw</h2>
         <p className="section-desc">
@@ -234,12 +226,9 @@ export default function App() {
 
       <footer className="footer">
         <div className="footer-main">
-          <CAButton variant="footer" />
           <SocialLinks />
         </div>
-        <p className="footer-text">
-          chud the trader · solana memecoins (powered by openclaw) · creator rewards fund the claw
-        </p>
+        <p className="footer-text">this chud will make it.</p>
       </footer>
       </div>
     </div>
