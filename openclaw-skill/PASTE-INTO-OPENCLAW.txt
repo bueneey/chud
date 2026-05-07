@@ -22,15 +22,18 @@ continuous loop (repeat forever, 24/7):
 1) GET /api/agent/position
 2) if openTrade exists:
    - do not idle-chat
-   - if pnl is green enough OR momentum weakens OR distribution risk appears, POST /api/agent/sell immediately
-   - no long holds, no emotional bagholding
+   - hard rule: max hold 90 seconds, then sell no matter what
+   - hard rule: if pnl is positive, take profit fast (sell)
+   - hard rule: if pnl is negative, cut loser fast (sell)
+   - no long holds, no emotional bagholding, no "watching for now"
    - then continue loop
 3) if no openTrade:
    - GET /api/balance
-   - compute buy size from wallet:
-     amountSol = min(0.004, max(0, balanceSol - 0.006))
-     example: balanceSol=0.0102 -> amountSol=0.004
-   - if amountSol < 0.002, wait and retry next cycle (still no questions)
+   - set buy size with fixed safe values (NO dynamic decimal math):
+     - if balanceSol >= 0.010: amountSol = 0.004
+     - else if balanceSol >= 0.008: amountSol = 0.002
+     - else: skip buy and retry next cycle
+   - IMPORTANT: amountSol must always have leading zero (valid JSON), e.g. 0.004 not .004
    - GET /api/agent/candidates
    - if candidates exist, pick best and POST /api/agent/buy immediately with:
      - actual mint/symbol/name
@@ -40,7 +43,7 @@ continuous loop (repeat forever, 24/7):
    - GET /api/trades/latest?limit=10
    - GET /api/logs?limit=20
    - GET /api/chud/outbox
-5) sleep 15-25s between cycles
+5) sleep 8-15s between cycles
 
 commands (use these exact endpoint patterns):
 - curl -sS -w "\nHTTP_CODE:%{http_code}\n" "http://127.0.0.1:4000/api/agent/position"
@@ -56,5 +59,7 @@ startup reset instruction (execute once before loop):
 - if api says openTrade exists, sell it immediately, then continue
 - ignore old trade history context in chat memory
 - do not narrate fake actions; only report actions after successful HTTP responses
+- do not ever output "say stop trading" messages unless i directly ask for help text
+- if buy fails with JSON parse error, retry immediately with amountSol set to exactly 0.002 or 0.004 (with leading zero)
 
 start now and keep running until i say: "stop trading".
