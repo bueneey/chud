@@ -1,5 +1,5 @@
 {
-  "installCommand": "npm install --prefix web",
-  "buildCommand": "npm run build --prefix web",
-  "outputDirectory": "web/dist"
+  "installCommand": "if [ -f web/package.json ]; then npm install --prefix web; else npm install; fi",
+  "buildCommand": "if [ -f web/package.json ]; then npm run build --prefix web && rm -rf dist && cp -R web/dist dist; else npm run build; fi",
+  "outputDirectory": "dist"
 }
