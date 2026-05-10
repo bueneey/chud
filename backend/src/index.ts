@@ -18,6 +18,16 @@ app.use(express.json());
 const PORT = Number(process.env.PORT) || 4000;
 const isProd = process.env.NODE_ENV === "production";
 
+/** Starting SOL for chart + trades-only balance fallback. Set when you reset bankroll / new wallet. Default 1. */
+function chartStartBalanceSol(): number {
+  const raw = process.env.CHUD_CHART_START_SOL?.trim();
+  if (raw) {
+    const n = Number(raw);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return 1;
+}
+
 async function getBalance(): Promise<number> {
   try {
     const { getWalletBalanceSol } = await import("clawdbot/agent");
@@ -28,7 +38,7 @@ async function getBalance(): Promise<number> {
   }
   const trades = realTradesOnly(getTrades()).filter((t) => t.sellTimestamp);
   const totalPnl = trades.reduce((s, t) => s + t.pnlSol, 0);
-  return 1 + totalPnl;
+  return chartStartBalanceSol() + totalPnl;
 }
 
 function realTradesOnly<T extends { mint: string }>(trades: T[]): T[] {
@@ -63,7 +73,7 @@ app.get("/api/balance/chart", async (_req, res) => {
     .filter((t) => t.sellTimestamp && t.sellTimestamp.length > 0)
     .sort((a, b) => new Date(a.sellTimestamp!).getTime() - new Date(b.sellTimestamp!).getTime());
   const points: { timestamp: string; balanceSol: number }[] = [];
-  const startBalance = 1;
+  const startBalance = chartStartBalanceSol();
   let balance = startBalance;
   if (trades.length > 0) {
     points.push({
@@ -114,6 +124,7 @@ app.get("/api/wallet-status", async (_req, res) => {
     res.json({
       connected: balance != null,
       balanceSol: balance ?? null,
+      expectedWalletPubkey: process.env.CHUD_WALLET_PUBLIC?.trim() || undefined,
       hasWallet,
       hasRpc,
       error: error ?? undefined,

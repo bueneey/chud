@@ -22,7 +22,7 @@ import {
 import { discoverCandidates } from "./discovery.js";
 import { loadKeypair } from "./wallet.js";
 import { executeBuy, executeSell, recordOpenBuy, getWalletBalanceSol } from "./trade.js";
-import { planHold, buildNarrativeWhy } from "./analysis.js";
+import { planHold, buildNarrativeWhy, pickBuySolNarrative } from "./analysis.js";
 import { getTokenPriceUsd, getTokenMcapUsd, getTokenStats, getBondingCurveSolReserves } from "./price.js";
 import { getHolderStats, hasBirdeyeApiKey } from "./birdeye.js";
 import {
@@ -316,9 +316,7 @@ async function runCycleBody(): Promise<void> {
   const holderStats = hasBirdeyeApiKey() ? await getHolderStats(chosen.mint) : null;
   const plan = planHold(chosen, filters, holderStats);
 
-  const minBuy = filters.minPositionSol ?? 0.1;
-  const maxBuy = filters.maxPositionSol ?? 0.25;
-  const buySol = minBuy + Math.random() * (maxBuy - minBuy);
+  const buySol = pickBuySolNarrative(chosen, filters);
   const { tokenAmount, tx: txBuy } = await executeBuy(chosen, buySol, filters);
   const buyTimestamp = new Date().toISOString();
 

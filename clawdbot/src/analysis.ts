@@ -133,3 +133,24 @@ export function buildNarrativeWhy(
 
   return [pick(openers, seed), pick(middle, seed + "m"), ...closer].join(" ").trim();
 }
+
+/**
+ * Buy size in [minPositionSol, maxPositionSol] with narrative-style variation:
+ * stronger volume/mcap + fresher pairs skew larger; jitter keeps sizes alternating.
+ */
+export function pickBuySolNarrative(coin: CandidateCoin, filters: Filters): number {
+  const min = filters.minPositionSol ?? 0.08;
+  const max = filters.maxPositionSol ?? 0.21;
+  if (max <= min) return min;
+  const span = max - min;
+  const vol = coin.volumeUsd ?? 0;
+  const mcap = Math.max(coin.mcapUsd ?? 1, 1);
+  const ratio = Math.min(3, vol / mcap) / 3;
+  const ageMin =
+    coin.pairCreatedAt != null ? (Date.now() - coin.pairCreatedAt) / 60000 : 60;
+  const freshness = Math.max(0, 1 - Math.min(ageMin, 60) / 60);
+  const score = Math.min(1, Math.max(0, ratio * 0.55 + freshness * 0.45));
+  const jitter = (Math.random() - 0.5) * 0.22;
+  const t = Math.min(1, Math.max(0, score + jitter));
+  return min + t * span;
+}
