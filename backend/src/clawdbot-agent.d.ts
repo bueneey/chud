@@ -30,6 +30,9 @@ declare module "clawdbot/agent" {
     | { ok: true; symbol: string; mint: string }
     | { ok: false; error: string }
   >;
+  export function isTradingPaused(): boolean;
+  export function getTradingPauseState(): { paused: boolean; fromEnv: boolean; fromFile: boolean };
+  export function setTradingPausedFile(paused: boolean): void;
   export function getWalletBalanceSol(): Promise<number | null>;
   export function getWalletBalanceWithError(): Promise<{ balance: number | null; error?: string }>;
 }

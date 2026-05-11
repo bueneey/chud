@@ -23,7 +23,7 @@ export function maybeStartThoughtPosting(): void {
     return;
   }
   started = true;
-  const ms = Math.max(5, mins) * 60 * 1000;
+  const ms = Math.max(1, mins) * 60 * 1000;
   const x = isXPostingConfigured();
   const skipTrade = process.env.CHUD_X_SKIP_TRADE_TWEETS === "1" || process.env.CHUD_X_SKIP_TRADE_TWEETS === "true";
   console.log(

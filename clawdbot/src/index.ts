@@ -33,6 +33,7 @@ import {
   emitSold,
 } from "./state.js";
 import { getPositionWithQuote } from "./agent-api.js";
+import { isTradingPaused } from "./trading-pause.js";
 import { askChudShouldSell, askChudPickCandidate } from "./llm.js";
 import { anyChudLlmConfigured } from "./llm-provider-order.js";
 import { postChudTweetBuy, postChudTweetSell, isXPostingConfigured, describeXPosting } from "./x-post.js";
@@ -211,6 +212,18 @@ async function runCycleBody(): Promise<void> {
       console.log(`[Clawdbot] Waiting ${loopDelay / 1000}s before next buy.`);
       await sleep(loopDelay);
     }
+    return;
+  }
+
+  if (isTradingPaused()) {
+    appendLog({
+      type: "skip",
+      message:
+        "Trading paused—no scan or new buys (CHUD_TRADING_PAUSED=1 or POST /api/agent/trading-paused). Sells still work.",
+    });
+    emitIdle();
+    const pollMs = Math.max(5000, Number(process.env.CHUD_TRADING_PAUSE_POLL_MS || "25000"));
+    await sleep(pollMs);
     return;
   }
 

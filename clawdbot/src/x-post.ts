@@ -10,6 +10,7 @@ import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { getDataDir } from "./config.js";
+import { writeChudOutbox } from "./outbox.js";
 
 const TWEET_MAX = 280;
 
@@ -95,10 +96,25 @@ export function isTradeEventXTweetingEnabled(): boolean {
 
 export function describeXPosting(): string {
   const c = resolveXPostChannel();
-  if (c === "api") return "X API (OAuth)";
-  if (c === "intent") return "browser compose URLs (no X API — opens default browser)";
-  if (c === "playwright") return "Playwright headless (saved login — no X API)";
-  return "off";
+  const ob = tradeOutboxEnabled() ? " + trade lines → /api/chud/outbox" : "";
+  if (c === "api") return "X API (OAuth)" + ob;
+  if (c === "intent") return "browser compose URLs (no X API — opens default browser)" + ob;
+  if (c === "playwright") return "Playwright headless (saved login — no X API)" + ob;
+  return "off (trade copy still → outbox if enabled)" + ob;
+}
+
+/** Every buy/sell writes tweet-sized text to chud-outbox.json for the site + OpenClaw (no X API needed). Set CHUD_TRADE_OUTBOX=0 to disable. */
+function tradeOutboxEnabled(): boolean {
+  return process.env.CHUD_TRADE_OUTBOX !== "0" && process.env.CHUD_TRADE_OUTBOX !== "false";
+}
+
+function pushTradeOutbox(prefix: "[buy]" | "[sell]", text: string): void {
+  if (!tradeOutboxEnabled()) return;
+  try {
+    writeChudOutbox(`${prefix} ${text}`);
+  } catch (e) {
+    console.warn("[Chud/X] outbox write failed:", e);
+  }
 }
 
 function openBrowserUrl(url: string): Promise<void> {
@@ -285,14 +301,16 @@ function sellTweetText(symbol: string, pnlSol: number, reason: string | undefine
 
 /** Fire-and-forget buy announcement */
 export function postChudTweetBuy(symbol: string, solAmount?: number, agentReason?: string): void {
-  if (!isTradeEventXTweetingEnabled()) return;
   const text = buyTweetText(symbol, solAmount, agentReason);
+  pushTradeOutbox("[buy]", text);
+  if (!isTradeEventXTweetingEnabled()) return;
   dispatchPost(text);
 }
 
 /** Fire-and-forget sell / PnL line */
 export function postChudTweetSell(symbol: string, pnlSol: number, reason?: string): void {
-  if (!isTradeEventXTweetingEnabled()) return;
   const text = sellTweetText(symbol, pnlSol, reason);
+  pushTradeOutbox("[sell]", text);
+  if (!isTradeEventXTweetingEnabled()) return;
   dispatchPost(text);
 }

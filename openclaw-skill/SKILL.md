@@ -49,9 +49,11 @@ When the human wants you **running** like the show doesn’t stop:
 2. **GET `/api/agent/candidates`** → pick → **POST buy** with a fat Chud `reason`.
 3. Loop: **GET `/api/agent/position`** on a sensible cadence (e.g. every few minutes or when they ping you) → monologue tape in character → **POST sell** when thesis breaks / target hit / loss accepted — **never** empty `reason`.
 4. After a sell, you may **immediately** scan candidates again and roll into the next bag **if** the human still wants action (still one position max).
-5. **GET `/api/chud/outbox`** sometimes — if you have a **browser / social** tool, post `text` as a shitpost; otherwise the server may already post it if `TWITTER_*` / `CHUD_X_POST_MODE` is set on Chud.
+5. **GET `/api/chud/outbox`** after buys/sells — lines prefixed **`[buy]`** / **`[sell]`** are ready-made tweet text (no X API). Post them yourself or open a local compose URL; Railway cannot open your laptop browser.
 
-Chud’s **built-in** auto-loop in the repo should stay **off** when you trade (`CHUD_OPENCLAW_ONLY=1`) so only **you** move the wallet.
+**Pick one mode on the Chud server:**  
+- **24/7 autonomous:** `CHUD_OPENCLAW_ONLY=0` + `CHUD_AUTONOMOUS_LOOP=true` — backend trades continuously; OpenClaw is optional (monitor / manual `POST /api/agent/sell` if you want).  
+- **OpenClaw-only:** `CHUD_OPENCLAW_ONLY=1` — chat must keep calling the API or nothing trades after idle.
 
 ## If buy fails with `missing api key` / `-32401`
 

@@ -249,6 +249,46 @@ app.post("/api/agent/force-close", async (req, res) => {
   }
 });
 
+app.get("/api/agent/trading-paused", async (_req, res) => {
+  try {
+    const { getTradingPauseState } = await import("clawdbot/agent");
+    res.json(getTradingPauseState());
+  } catch (e) {
+    console.error("[Backend] trading-paused GET error:", e);
+    res.status(503).json({ error: "Unavailable. Build clawdbot.", detail: String(e) });
+  }
+});
+
+app.post("/api/agent/trading-paused", express.json(), async (req, res) => {
+  try {
+    const secret =
+      process.env.CHUD_TRADING_PAUSE_SECRET?.trim() || process.env.CHUD_FORCE_CLOSE_SECRET?.trim();
+    if (!secret) {
+      return res.status(503).json({
+        ok: false,
+        error:
+          "Set CHUD_TRADING_PAUSE_SECRET or CHUD_FORCE_CLOSE_SECRET to enable POST /api/agent/trading-paused",
+      });
+    }
+    const got = String(req.headers["x-chud-trading-pause"] ?? req.body?.secret ?? "").trim();
+    if (got !== secret) {
+      return res.status(403).json({
+        ok: false,
+        error: "Invalid or missing secret (header X-Chud-Trading-Pause or body.secret)",
+      });
+    }
+    if (typeof req.body?.paused !== "boolean") {
+      return res.status(400).json({ ok: false, error: 'JSON body must include "paused": true or false' });
+    }
+    const { setTradingPausedFile, getTradingPauseState } = await import("clawdbot/agent");
+    setTradingPausedFile(req.body.paused);
+    res.json({ ok: true, ...getTradingPauseState() });
+  } catch (e) {
+    console.error("[Backend] trading-paused POST error:", e);
+    res.status(500).json({ ok: false, error: e instanceof Error ? e.message : String(e) });
+  }
+});
+
 app.get("/api/coach/messages", async (_req, res) => {
   try {
     const { getCoachMessages } = await import("clawdbot/coach-notes");
@@ -345,7 +385,7 @@ app.get("/api/agent/info", (_req, res) => {
   const walletPrivateKeySet = !!process.env.WALLET_PRIVATE_KEY?.trim();
   res.json({
     message:
-      "Chud agent API. GET candidates, position. POST buy / sell. POST force-close (CHUD_FORCE_CLOSE_SECRET). Buys retry pools (CHUD_BUY_POOL_FALLBACKS); sells retry (CHUD_SELL_POOL_FALLBACKS). Trade-local calls omit ?api-key= by default (Lightning keys + external wallet → HTTP 400); set PUMPPORTAL_APPEND_KEY_TO_TRADE_LOCAL=1 only if Portal gave you a local-compatible key.",
+      "Chud agent API. GET candidates, position. POST buy / sell. POST force-close (CHUD_FORCE_CLOSE_SECRET). GET/POST trading-paused (secret: CHUD_TRADING_PAUSE_SECRET or same as force-close). Buys retry pools (CHUD_BUY_POOL_FALLBACKS); sells retry (CHUD_SELL_POOL_FALLBACKS). Trade-local calls omit ?api-key= by default (Lightning keys + external wallet → HTTP 400); set PUMPPORTAL_APPEND_KEY_TO_TRADE_LOCAL=1 only if Portal gave you a local-compatible key.",
     baseUrl: CHUD_AGENT_BASE,
     pumpPortalApiKeySet: pumpKey,
     pumpPortalKeyOnTradeLocal,
@@ -357,6 +397,7 @@ app.get("/api/agent/info", (_req, res) => {
       buy: `${CHUD_AGENT_BASE}/api/agent/buy`,
       sell: `${CHUD_AGENT_BASE}/api/agent/sell`,
       forceClose: `${CHUD_AGENT_BASE}/api/agent/force-close`,
+      tradingPaused: `${CHUD_AGENT_BASE}/api/agent/trading-paused`,
       chudOutbox: `${CHUD_AGENT_BASE}/api/chud/outbox`,
     },
   });

@@ -34,6 +34,11 @@ import { emitBought, emitSold, emitIdle } from "./state.js";
 import { postChudTweetBuy, postChudTweetSell } from "./x-post.js";
 import { getTokenPriceUsd, getTokenMcapUsd, getTokenStats } from "./price.js";
 import { getHolderStats, hasBirdeyeApiKey } from "./birdeye.js";
+import {
+  isTradingPaused as isTradingPausedImpl,
+  getTradingPauseState as getTradingPauseStateImpl,
+  setTradingPausedFile as setTradingPausedFileImpl,
+} from "./trading-pause.js";
 
 export interface AgentPosition {
   state: ReturnType<typeof getState>;
@@ -216,6 +221,14 @@ export async function buy(params: BuyParams): Promise<{ ok: true; symbol: string
   }
   params = { ...params, mint, symbol, name };
 
+  if (isTradingPausedImpl()) {
+    return {
+      ok: false,
+      error:
+        "Trading is paused. Clear CHUD_TRADING_PAUSED or POST /api/agent/trading-paused with {\"paused\":false} (and secret). Sells still work.",
+    };
+  }
+
   const open = getOpenTrade();
   if (open) {
     return { ok: false, error: `Already in position: ${open.symbol}. Sell first.` };
@@ -327,6 +340,18 @@ export async function sell(params?: { reason?: string }): Promise<
     const msg = e instanceof Error ? e.message : String(e);
     return { ok: false, error: msg };
   }
+}
+
+export function isTradingPaused(): boolean {
+  return isTradingPausedImpl();
+}
+
+export function getTradingPauseState(): ReturnType<typeof getTradingPauseStateImpl> {
+  return getTradingPauseStateImpl();
+}
+
+export function setTradingPausedFile(paused: boolean): void {
+  setTradingPausedFileImpl(paused);
 }
 
 export {
