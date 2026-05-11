@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   fetchLatestTrades,
   fetchBalance,
+  fetchWalletStatus,
   fetchPnl,
   fetchBalanceChart,
   fetchChudState,
@@ -14,6 +15,7 @@ import {
   type ChudChatTurn,
   type LogEntry,
   type ChudOutboxResponse,
+  type WalletStatus,
 } from "./api";
 import { ChudPanel } from "./ChudPanel";
 import { ChudScene } from "./ChudScene";
@@ -39,6 +41,7 @@ export default function App() {
   const [chatLlmConfigured, setChatLlmConfigured] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [outbox, setOutbox] = useState<ChudOutboxResponse>({ text: null, at: null });
+  const [walletStatus, setWalletStatus] = useState<WalletStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [walletCopied, setWalletCopied] = useState(false);
   const [page, setPage] = useState<PageView>("home");
@@ -57,6 +60,7 @@ export default function App() {
     Promise.all([
       fetchLatestTrades(50),
       fetchBalance(),
+      fetchWalletStatus().catch(() => null as WalletStatus | null),
       fetchPnl(),
       fetchBalanceChart(),
       fetchChudState(),
@@ -64,9 +68,10 @@ export default function App() {
       fetchLogs(200).catch(() => [] as LogEntry[]),
       fetchChudOutbox(),
     ])
-      .then(([t, b, p, chart, s, chat, logsData, outboxData]) => {
+      .then(([t, b, ws, p, chart, s, chat, logsData, outboxData]) => {
         setTrades(t);
         setBalance(b);
+        setWalletStatus(ws);
         setPnl(p.totalPnlSol);
         setBalanceChartPoints(chart.points ?? []);
         setState(s);
@@ -176,6 +181,22 @@ export default function App() {
             <div className="panel-title">balance</div>
             <div className="stat-value">{balance.toFixed(4)} SOL</div>
             <p className="stat-desc">current wallet (start 1 SOL + pnl)</p>
+            {walletStatus?.tradingWalletPubkey && (
+              <p
+                className="stat-desc"
+                style={
+                  walletStatus.pubkeyMatchesExpected === false
+                    ? { color: "var(--red)", marginTop: "0.35rem" }
+                    : { marginTop: "0.35rem" }
+                }
+              >
+                api signs: {walletStatus.tradingWalletPubkey.slice(0, 4)}…
+                {walletStatus.tradingWalletPubkey.slice(-4)}
+                {walletStatus.pubkeyMatchesExpected === false && (
+                  <> — does not match site wallet (fix Railway WALLET_PRIVATE_KEY)</>
+                )}
+              </p>
+            )}
           </div>
           <div className="panel stat-box">
             <div className="panel-title">total pnl</div>

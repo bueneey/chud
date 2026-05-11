@@ -9,6 +9,7 @@ if (envPath) config({ path: envPath });
 
 import express from "express";
 import cors from "cors";
+import { getPublicKeyBase58 } from "clawdbot/wallet";
 import { getTrades, getState, getFilters, getLogs } from "./data.js";
 
 const app = express();
@@ -121,22 +122,32 @@ app.get("/api/wallet-status", async (_req, res) => {
     const { balance, error } = await getWalletBalanceWithError();
     const hasWallet = !!process.env.WALLET_PRIVATE_KEY?.trim();
     const hasRpc = !!process.env.SOLANA_RPC_URL?.trim();
+    const tradingWalletPubkey =
+      typeof getPublicKeyBase58 === "function" ? getPublicKeyBase58() : null;
+    const expected = process.env.CHUD_WALLET_PUBLIC?.trim();
+    const pubkeyMatchesExpected =
+      !expected || !tradingWalletPubkey ? undefined : tradingWalletPubkey === expected;
     res.json({
       connected: balance != null,
       balanceSol: balance ?? null,
-      expectedWalletPubkey: process.env.CHUD_WALLET_PUBLIC?.trim() || undefined,
+      tradingWalletPubkey,
+      expectedWalletPubkey: expected || undefined,
+      pubkeyMatchesExpected,
       hasWallet,
       hasRpc,
       error: error ?? undefined,
-      hint: balance == null
-        ? error
-          ? error
-          : !hasWallet
-            ? "Set WALLET_PRIVATE_KEY in .env (or Railway Variables)"
-            : !hasRpc
-              ? "Set SOLANA_RPC_URL in .env (or Railway Variables)"
-              : "RPC call failed"
-        : undefined,
+      hint:
+        pubkeyMatchesExpected === false
+          ? "Railway WALLET_PRIVATE_KEY pubkey does not match CHUD_WALLET_PUBLIC — update the secret to the keypair for your main wallet."
+          : balance == null
+            ? error
+              ? error
+              : !hasWallet
+                ? "Set WALLET_PRIVATE_KEY in .env (or Railway Variables)"
+                : !hasRpc
+                  ? "Set SOLANA_RPC_URL in .env (or Railway Variables)"
+                  : "RPC call failed"
+            : undefined,
     });
   } catch (e) {
     res.json({

@@ -4,11 +4,36 @@
   "type": "module",
   "main": "dist/index.js",
   "exports": {
-    ".": "./dist/index.js",
-    "./agent": "./dist/agent-api.js",
-    "./coach-notes": "./dist/coach-notes.js",
-    "./chud-chat": "./dist/chud-chat.js",
-    "./outbox": "./dist/outbox.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./agent": {
+      "types": "./dist/agent-api.d.ts",
+      "import": "./dist/agent-api.js",
+      "default": "./dist/agent-api.js"
+    },
+    "./coach-notes": {
+      "types": "./dist/coach-notes.d.ts",
+      "import": "./dist/coach-notes.js",
+      "default": "./dist/coach-notes.js"
+    },
+    "./chud-chat": {
+      "types": "./dist/chud-chat.d.ts",
+      "import": "./dist/chud-chat.js",
+      "default": "./dist/chud-chat.js"
+    },
+    "./outbox": {
+      "types": "./dist/outbox.d.ts",
+      "import": "./dist/outbox.js",
+      "default": "./dist/outbox.js"
+    },
+    "./wallet": {
+      "types": "./dist/wallet.d.ts",
+      "import": "./dist/wallet.js",
+      "default": "./dist/wallet.js"
+    }
   },
   "scripts": {
     "dev": "tsx watch src/index.ts",
