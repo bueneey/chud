@@ -161,8 +161,21 @@ export interface ChudChatTurn {
   at: string;
 }
 
-export async function fetchChudChat(): Promise<{ messages: ChudChatTurn[]; llmConfigured: boolean }> {
-  const res = await apiFetch("/chat/messages");
+export async function fetchChudChat(chatSessionId: string): Promise<{ messages: ChudChatTurn[]; llmConfigured: boolean }> {
+  const res = await fetch(`${API}/chat/messages`, {
+    headers: { "X-Chud-Chat-Session": chatSessionId },
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    let msg = `API /chat/messages: ${res.status}`;
+    try {
+      const j = JSON.parse(text);
+      if (j?.error) msg = j.error;
+    } catch {
+      if (text) msg += " " + text.slice(0, 200);
+    }
+    throw new Error(msg);
+  }
   const data = await res.json();
   return {
     messages: data.messages ?? [],
@@ -170,10 +183,16 @@ export async function fetchChudChat(): Promise<{ messages: ChudChatTurn[]; llmCo
   };
 }
 
-export async function postChudChat(text: string, alsoCoachNote = false): Promise<{ user: ChudChatTurn; assistant: ChudChatTurn }> {
+export async function postChudChat(
+  text: string,
+  alsoCoachNote = false,
+  chatSessionId?: string
+): Promise<{ user: ChudChatTurn; assistant: ChudChatTurn }> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (chatSessionId) headers["X-Chud-Chat-Session"] = chatSessionId;
   const res = await fetch(`${API}/chat/messages`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({ text, alsoCoachNote }),
   });
   if (!res.ok) {
@@ -192,8 +211,10 @@ export async function postChudChat(text: string, alsoCoachNote = false): Promise
   return { user: data.user, assistant: data.assistant };
 }
 
-export async function postChudChatClear(): Promise<void> {
-  const res = await fetch(`${API}/chat/clear`, { method: "POST" });
+export async function postChudChatClear(chatSessionId?: string): Promise<void> {
+  const headers: Record<string, string> = {};
+  if (chatSessionId) headers["X-Chud-Chat-Session"] = chatSessionId;
+  const res = await fetch(`${API}/chat/clear`, { method: "POST", headers });
   if (!res.ok) {
     const t = await res.text();
     throw new Error(t || `clear failed ${res.status}`);

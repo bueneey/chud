@@ -311,10 +311,13 @@ app.post("/api/coach/messages", async (req, res) => {
   }
 });
 
-app.get("/api/chat/messages", async (_req, res) => {
+app.get("/api/chat/messages", async (req, res) => {
   try {
-    const { getChudChatMessages, chudChatLlmConfigured } = await import("clawdbot/chud-chat");
-    res.json({ messages: getChudChatMessages(100), llmConfigured: chudChatLlmConfigured() });
+    const { getChudChatMessages, chudChatLlmConfigured, normalizeChudChatSessionId } = await import("clawdbot/chud-chat");
+    const h = req.headers["x-chud-chat-session"];
+    const raw = Array.isArray(h) ? h[0] : h;
+    const sessionId = normalizeChudChatSessionId(raw);
+    res.json({ messages: getChudChatMessages(100, sessionId), llmConfigured: chudChatLlmConfigured() });
   } catch (e) {
     console.error("[Backend] chat messages error:", e);
     res.status(503).json({ error: "Chat unavailable. Build clawdbot.", detail: String(e) });
@@ -323,10 +326,14 @@ app.get("/api/chat/messages", async (_req, res) => {
 
 app.post("/api/chat/messages", async (req, res) => {
   try {
-    const { sendChudChatUserMessage } = await import("clawdbot/chud-chat");
+    const { sendChudChatUserMessage, normalizeChudChatSessionId } = await import("clawdbot/chud-chat");
     const text = typeof req.body?.text === "string" ? req.body.text : "";
     const alsoCoachNote = req.body?.alsoCoachNote === true;
-    const out = await sendChudChatUserMessage(text, { alsoCoachNote });
+    const h = req.headers["x-chud-chat-session"];
+    const fromHeader = Array.isArray(h) ? h[0] : h;
+    const fromBody = typeof req.body?.sessionId === "string" ? req.body.sessionId : undefined;
+    const sessionId = normalizeChudChatSessionId(fromHeader ?? fromBody);
+    const out = await sendChudChatUserMessage(text, { alsoCoachNote, sessionId });
     res.json({ ok: true, user: out.user, assistant: out.assistant });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -335,10 +342,13 @@ app.post("/api/chat/messages", async (req, res) => {
   }
 });
 
-app.post("/api/chat/clear", async (_req, res) => {
+app.post("/api/chat/clear", async (req, res) => {
   try {
-    const { clearChudChat } = await import("clawdbot/chud-chat");
-    clearChudChat();
+    const { clearChudChat, normalizeChudChatSessionId } = await import("clawdbot/chud-chat");
+    const h = req.headers["x-chud-chat-session"];
+    const raw = Array.isArray(h) ? h[0] : h;
+    const sessionId = normalizeChudChatSessionId(raw);
+    clearChudChat(sessionId);
     res.json({ ok: true });
   } catch (e) {
     res.status(503).json({ ok: false, error: String(e) });

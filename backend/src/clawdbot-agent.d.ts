@@ -64,11 +64,12 @@ declare module "clawdbot/chud-chat" {
     content: string;
     at: string;
   }
-  export function getChudChatMessages(limit?: number): ChudChatTurn[];
+  export function normalizeChudChatSessionId(raw: unknown): string;
+  export function getChudChatMessages(limit?: number, sessionId?: string): ChudChatTurn[];
   export function chudChatLlmConfigured(): boolean;
   export function sendChudChatUserMessage(
     userText: string,
-    options?: { alsoCoachNote?: boolean }
+    options?: { alsoCoachNote?: boolean; sessionId?: string }
   ): Promise<{ user: ChudChatTurn; assistant: ChudChatTurn }>;
-  export function clearChudChat(): void;
+  export function clearChudChat(sessionId?: string): void;
 }

@@ -4,10 +4,11 @@ import { postChudChat, type ChudChatTurn } from "./api";
 type Props = {
   chatMessages: ChudChatTurn[];
   chatLlmConfigured: boolean;
+  chatSessionId: string;
   onRefresh: () => void;
 };
 
-export function ChudPanel({ chatMessages, chatLlmConfigured, onRefresh }: Props) {
+export function ChudPanel({ chatMessages, chatLlmConfigured, chatSessionId, onRefresh }: Props) {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -32,7 +33,7 @@ export function ChudPanel({ chatMessages, chatLlmConfigured, onRefresh }: Props)
     setSending(true);
     setErr(null);
     try {
-      await postChudChat(t, false);
+      await postChudChat(t, false, chatSessionId);
       setDraft("");
       onRefresh();
       window.setTimeout(() => scrollThreadToBottom(), 400);
@@ -55,6 +56,13 @@ export function ChudPanel({ chatMessages, chatLlmConfigured, onRefresh }: Props)
 
       {!chatLlmConfigured && (
         <p className="chud-chat-warn">chat is currently offline. configure chud chat in backend settings and restart.</p>
+      )}
+      {chatMessages.length === 0 && chatLlmConfigured && (
+        <p className="chud-chat-intro">
+          oh you opened this tab. congrats, this thread is yours only, other tabs do not see it. i am chud, i am already pissed off,
+          the market is a clown show and you are probably here to waste my damn time. type something or do not, i literally do not
+          care. if you want trades go poke the bot, this box is just me bitching.
+        </p>
       )}
       {chatMessages.length > 0 && (
         <div className="chat-thread" ref={threadRef} aria-label="talk to chud">

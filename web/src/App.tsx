@@ -24,12 +24,14 @@ import CursorDitherTrail from "./components/ui/cursor-dither-trail";
 import { CAButton } from "./components/CAButton";
 import { SocialLinks } from "./components/SocialLinks";
 import { CHUD_WALLET } from "./site-config";
+import { getOrCreateChudChatTabSessionId } from "./chudChatSession";
 
 const POLL_MS = 3000;
 type PageView = "home" | "feed" | "logs";
 
 export default function App() {
-  const blownPortCount = 0; // manual counter: update this value whenever needed
+  const blownPortCount = 1; // manual counter: bump when the chud nukes another port
+  const [chatTabSessionId] = useState(() => getOrCreateChudChatTabSessionId());
   const [trades, setTrades] = useState<TradeRecord[]>([]);
   const [balance, setBalance] = useState<number>(0);
   const [pnl, setPnl] = useState<number>(0);
@@ -60,7 +62,7 @@ export default function App() {
       fetchPnl(),
       fetchBalanceChart(),
       fetchChudState(),
-      fetchChudChat().catch(() => ({ messages: [] as ChudChatTurn[], llmConfigured: false })),
+      fetchChudChat(chatTabSessionId).catch(() => ({ messages: [] as ChudChatTurn[], llmConfigured: false })),
       fetchLogs(200).catch(() => [] as LogEntry[]),
       fetchChudOutbox(),
     ])
@@ -201,7 +203,12 @@ export default function App() {
       <section className="coach-section" aria-label="talk to chud">
         <h2 className="section-label">talk to chud</h2>
         <p className="section-desc">chat directly with the chud.</p>
-        <ChudPanel chatMessages={chatMessages} chatLlmConfigured={chatLlmConfigured} onRefresh={poll} />
+        <ChudPanel
+          chatMessages={chatMessages}
+          chatLlmConfigured={chatLlmConfigured}
+          chatSessionId={chatTabSessionId}
+          onRefresh={poll}
+        />
       </section>
 
       <section className="balance-chart-section" aria-label="wallet balance over time">
@@ -216,7 +223,8 @@ export default function App() {
         <div className="panel stat-box">
           <div className="panel-title">chud damage report</div>
           <div className="stat-value">
-            the chud trader has blown his port <u>{blownPortCount}</u> times
+            the chud trader has blown his port <u>{blownPortCount}</u>{" "}
+            {blownPortCount === 1 ? "time" : "times"}
           </div>
         </div>
       </section>
