@@ -322,6 +322,7 @@ export async function executeBuy(
   const conn = new Connection(rpc);
   const pools = buyPoolFallbackList();
   let lastErr: Error | null = null;
+  const attempts: string[] = [];
 
   for (let pi = 0; pi < pools.length; pi++) {
     const pool = pools[pi]!;
@@ -354,16 +355,24 @@ export async function executeBuy(
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       lastErr = e instanceof Error ? e : new Error(msg);
+      attempts.push(`${pool}: ${msg.slice(0, 220)}`);
       const hasNext = pi < pools.length - 1;
       if (hasNext && buyFailureMayTryNextPool(msg)) {
         console.warn("[Chud] buy pool %s failed → try next (%s)", pool, msg.slice(0, 200));
         continue;
       }
-      throw lastErr;
+      const attemptSummary = attempts.slice(-6).join(" | ");
+      throw new Error(
+        `${msg} [pool-attempts] ${attemptSummary || "(none)"}`
+      );
     }
   }
 
-  throw lastErr ?? new Error("PumpPortal buy failed for all pools in CHUD_BUY_POOL_FALLBACKS");
+  const attemptSummary = attempts.slice(-6).join(" | ");
+  throw new Error(
+    (lastErr?.message || "PumpPortal buy failed for all pools in CHUD_BUY_POOL_FALLBACKS") +
+      ` [pool-attempts] ${attemptSummary || "(none)"}`
+  );
 }
 
 export async function executeSell(
