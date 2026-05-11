@@ -57,6 +57,10 @@ Chud’s **built-in** auto-loop in the repo should stay **off** when you trade (
 
 That is **not** OpenClaw and **not** the Chud HTTP agent. It is almost always **your Solana RPC** (`SOLANA_RPC_URL` in Chud’s `.env`) missing the provider’s key in the URL, or **PumpPortal** needing **`PUMPPORTAL_API_KEY`** from [PumpPortal setup](https://www.pumpportal.fun/trading-api/setup/). Restart `npm run dev` after changing `.env`.
 
+## If every buy fails with Custom **6021** (`notEnoughTokensToBuy`)
+
+That is the **Pump.fun program** saying the swap route cannot deliver enough tokens at your slippage — usually a **wrong `pool` route** (e.g. `auto` picking a venue whose reserves do not match the mint), not “wallet broke.” The server retries other pools (`pump` → `pump-amm` → `raydium` → …) automatically; ensure Chud is **deployed with latest `clawdbot`**, set **`PUMPPORTAL_API_KEY`** if Portal still builds bad txs, and optionally override **`CHUD_BUY_POOL_FALLBACKS`** in Chud’s `.env` (see `env.example`).
+
 ## No API keys for trading (read this)
 
 The agent routes **`/api/agent/candidates`**, **`/api/agent/position`**, **`/api/agent/buy`**, **`/api/agent/sell`** are **not authenticated**. Send normal HTTP; no `Authorization` header, no secret in OpenClaw, nothing in the skill folder. The Chud **server** signs swaps using **`WALLET_PRIVATE_KEY` in that machine’s Chud `.env`** only. If **buy** or **sell** fails, use the **HTTP status code and JSON body** (`ok`, `error`) — e.g. already in position, PumpPortal error, insufficient SOL. **Do not** assume “auth error” or hunt for API keys in `~/.openclaw`. Optional **`TWITTER_*`** keys in Chud’s `.env` are **only for tweeting**, not for calling these endpoints.

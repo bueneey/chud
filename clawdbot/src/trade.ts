@@ -34,6 +34,11 @@ function pumpPortalTradeLocalUrl(): string {
   return base;
 }
 
+/** True when `PUMPPORTAL_API_KEY` (or legacy `PUMP_FUN_API_KEY`) is set — Portal appends `?api-key=` on trade-local. */
+export function isPumpPortalApiKeyConfigured(): boolean {
+  return !!(process.env.PUMPPORTAL_API_KEY || process.env.PUMP_FUN_API_KEY)?.trim();
+}
+
 function genId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2);
 }
@@ -76,11 +81,10 @@ async function readWalletTokenUiAmount(conn: Connection, owner: PublicKey, mint:
   let sum = 0;
   for (const row of accounts) {
     const data = row.account.data as ParsedAccountData;
-    if (data.program !== "spl-token") continue;
     const info = data.parsed?.info as
       | { mint?: string; tokenAmount?: { uiAmount?: number | null; amount?: string; decimals?: number } }
       | undefined;
-    if (!info?.mint || info.mint !== mint) continue;
+    if (!info?.mint || info.mint !== mint || !info.tokenAmount) continue;
     const ta = info.tokenAmount;
     if (ta?.uiAmount != null && Number.isFinite(ta.uiAmount)) {
       sum += ta.uiAmount;
@@ -126,10 +130,16 @@ async function fetchSerializedTx(params: {
     pool: params.pool,
   });
   const url = pumpPortalTradeLocalUrl();
+  const fetchMs = Math.min(120_000, Math.max(15_000, Number(process.env.CHUD_PUMPPORTAL_FETCH_MS ?? "90000") || 90_000));
   const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Accept: "application/octet-stream, application/json;q=0.9, */*;q=0.8",
+      "User-Agent": "ChudTheTrader/1.0",
+    },
     body: body.toString(),
+    signal: AbortSignal.timeout(fetchMs),
   });
   const raw = await res.arrayBuffer();
   const buf = new Uint8Array(raw);
@@ -153,42 +163,39 @@ async function fetchSerializedTx(params: {
   return raw;
 }
 
-export async function executeBuy(
-  candidate: CandidateCoin,
-  solAmount: number,
-  filters: Filters
-): Promise<{ tokenAmount: number; tx?: string }> {
-  const keypair = loadKeypair();
-  const rpc = process.env.SOLANA_RPC_URL;
-  if (!keypair || !rpc) {
-    // Demo: fake numbers
-    const tokenAmount = Math.floor(solAmount * 1e6 * (5000 + Math.random() * 5000));
-    return { tokenAmount, tx: "demo_buy_" + genId() };
-  }
+/** PumpPortal default is `pump`; `auto` often mis-routes and hits Pump program 6021 (notEnoughTokensToBuy). */
+const DEFAULT_BUY_POOL_FALLBACKS = "pump,pump-amm,raydium,auto,bonk,launchlab,raydium-cpmm";
 
-  const amountLamports = Math.floor(solAmount * 1e9);
-  const buf = await fetchSerializedTx({
-    publicKey: keypair.publicKey.toBase58(),
-    action: "buy",
-    mint: candidate.mint,
-    amount: String(amountLamports),
-    denominatedInSol: "true",
-    slippage: filters.slippagePercent ?? 15,
-    priorityFee: filters.priorityFeeSol ?? 0.0001,
-    pool: "auto",
-  });
-  const tx = VersionedTransaction.deserialize(new Uint8Array(buf));
-  tx.sign([keypair]);
-  const conn = new Connection(rpc);
+function buyPoolFallbackList(): string[] {
+  const raw = process.env.CHUD_BUY_POOL_FALLBACKS?.trim() || DEFAULT_BUY_POOL_FALLBACKS;
+  return raw.split(",").map((s) => s.trim()).filter(Boolean);
+}
 
-  let sig: string;
+/**
+ * True if another PumpPortal `pool` may fix the failure (wrong venue vs bonding curve / PumpSwap / Raydium).
+ * Pump custom 6021 = notEnoughTokensToBuy; 6024 = overflow (often post-upgrade / bad account layout — new pool helps sometimes).
+ */
+function buyFailureMayTryNextPool(errMsg: string): boolean {
+  if (/missing api key|32401|Blockhash not found|insufficient funds|0x1\b/i.test(errMsg)) return false;
+  return (
+    /\b6021\b|\b6024\b|0x1785|0x1788|notEnoughTokensToBuy|BondingCurveComplete|curve complete|InstructionError/i.test(
+      errMsg
+    ) || /PumpPortal buy \(HTTP/i.test(errMsg)
+  );
+}
+
+async function sendSignedVersionedTxWithRetries(
+  conn: Connection,
+  tx: VersionedTransaction
+): Promise<string> {
+  let sig: string | undefined;
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       sig = await conn.sendTransaction(tx, {
         skipPreflight: attempt >= 2,
         maxRetries: 3,
       });
-      break;
+      return sig;
     } catch (e: unknown) {
       const msg = String((e as Error)?.message ?? e);
       if (msg.includes("Blockhash not found") && attempt < 2) {
@@ -203,19 +210,68 @@ export async function executeBuy(
       throw e;
     }
   }
+  throw new Error("sendTransaction: exhausted retries");
+}
 
-  await confirmSignatureSucceededOrThrow(conn, sig!);
-
-  const tokenUi = await readWalletTokenUiAmountWithRetry(conn, keypair.publicKey, candidate.mint, {
-    attempts: 12,
-    delayMs: 750,
-  });
-  if (!(tokenUi > 0)) {
-    throw new Error(
-      `Buy transaction confirmed but wallet still shows 0 ${candidate.symbol} (${candidate.mint.slice(0, 8)}…) — check RPC / mint, or retry.`
-    );
+export async function executeBuy(
+  candidate: CandidateCoin,
+  solAmount: number,
+  filters: Filters
+): Promise<{ tokenAmount: number; tx?: string }> {
+  const keypair = loadKeypair();
+  const rpc = process.env.SOLANA_RPC_URL;
+  if (!keypair || !rpc) {
+    // Demo: fake numbers
+    const tokenAmount = Math.floor(solAmount * 1e6 * (5000 + Math.random() * 5000));
+    return { tokenAmount, tx: "demo_buy_" + genId() };
   }
-  return { tokenAmount: tokenUi, tx: sig! };
+
+  const amountLamports = Math.floor(solAmount * 1e9);
+  const conn = new Connection(rpc);
+  const pools = buyPoolFallbackList();
+  let lastErr: Error | null = null;
+
+  for (let pi = 0; pi < pools.length; pi++) {
+    const pool = pools[pi]!;
+    try {
+      const buf = await fetchSerializedTx({
+        publicKey: keypair.publicKey.toBase58(),
+        action: "buy",
+        mint: candidate.mint,
+        amount: String(amountLamports),
+        denominatedInSol: "true",
+        slippage: filters.slippagePercent ?? 15,
+        priorityFee: filters.priorityFeeSol ?? 0.0001,
+        pool,
+      });
+      const tx = VersionedTransaction.deserialize(new Uint8Array(buf));
+      tx.sign([keypair]);
+      const sig = await sendSignedVersionedTxWithRetries(conn, tx);
+      await confirmSignatureSucceededOrThrow(conn, sig);
+      const tokenUi = await readWalletTokenUiAmountWithRetry(conn, keypair.publicKey, candidate.mint, {
+        attempts: 12,
+        delayMs: 750,
+      });
+      if (!(tokenUi > 0)) {
+        throw new Error(
+          `Buy transaction confirmed but wallet still shows 0 ${candidate.symbol} (${candidate.mint.slice(0, 8)}…) — check RPC / mint, or retry.`
+        );
+      }
+      console.log("[Chud] buy ok pool=%s mint=%s…", pool, candidate.mint.slice(0, 8));
+      return { tokenAmount: tokenUi, tx: sig };
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      lastErr = e instanceof Error ? e : new Error(msg);
+      const hasNext = pi < pools.length - 1;
+      if (hasNext && buyFailureMayTryNextPool(msg)) {
+        console.warn("[Chud] buy pool %s failed → try next (%s)", pool, msg.slice(0, 200));
+        continue;
+      }
+      throw lastErr;
+    }
+  }
+
+  throw lastErr ?? new Error("PumpPortal buy failed for all pools in CHUD_BUY_POOL_FALLBACKS");
 }
 
 export async function executeSell(
