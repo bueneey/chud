@@ -90,24 +90,6 @@ export async function fetchBalance(): Promise<number> {
   return data.balanceSol ?? 0;
 }
 
-export interface WalletStatus {
-  tradingWalletPubkey: string | null;
-  expectedWalletPubkey?: string;
-  pubkeyMatchesExpected?: boolean;
-  hint?: string;
-}
-
-export async function fetchWalletStatus(): Promise<WalletStatus> {
-  const res = await apiFetch("/wallet-status");
-  const data = await res.json();
-  return {
-    tradingWalletPubkey: data.tradingWalletPubkey ?? null,
-    expectedWalletPubkey: data.expectedWalletPubkey,
-    pubkeyMatchesExpected: data.pubkeyMatchesExpected,
-    hint: data.hint,
-  };
-}
-
 export async function fetchPnl(): Promise<{ totalPnlSol: number; tradeCount: number }> {
   const res = await apiFetch("/pnl");
   const data = await res.json();
