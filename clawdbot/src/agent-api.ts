@@ -254,39 +254,12 @@ export async function buy(params: BuyParams): Promise<{ ok: true; symbol: string
   };
   try {
     clearStaleOpenTrades();
-    let buySolUsed = amountSol;
-    let tokenAmount: number;
-    let txBuy: string | undefined;
-    try {
-      const first = await executeBuy(candidate, buySolUsed, filters);
-      tokenAmount = first.tokenAmount;
-      txBuy = first.tx;
-    } catch (firstErr) {
-      const msg = firstErr instanceof Error ? firstErr.message : String(firstErr);
-      const shouldRetry6021 = /\b6021\b|notEnoughTokensToBuy/i.test(msg);
-      const retrySol = Math.max(0.02, Math.min(buySolUsed * 0.6, buySolUsed - 0.01));
-      if (!shouldRetry6021 || retrySol >= buySolUsed - 1e-9) throw firstErr;
-      const retryFilters = {
-        ...filters,
-        slippagePercent: Math.min(95, (filters.slippagePercent ?? 15) + 20),
-        priorityFeeSol: Math.max(filters.priorityFeeSol ?? 0.0001, 0.0005),
-      };
-      appendLog({
-        type: "thinking",
-        symbol: candidate.symbol,
-        message: `[openclaw] buy retry $${candidate.symbol} after 6021`,
-        reason: `${buySolUsed.toFixed(3)}→${retrySol.toFixed(3)} SOL, slip ${filters.slippagePercent ?? 15}→${retryFilters.slippagePercent}`,
-      });
-      const retry = await executeBuy(candidate, retrySol, retryFilters);
-      buySolUsed = retrySol;
-      tokenAmount = retry.tokenAmount;
-      txBuy = retry.tx;
-    }
+    const { tokenAmount, tx: txBuy } = await executeBuy(candidate, amountSol, filters);
     const buyTimestamp = new Date().toISOString();
     const mcapUsd = await getTokenMcapUsd(candidate.mint).catch(() => undefined);
     const holderStats = hasBirdeyeApiKey() ? await getHolderStats(candidate.mint) : null;
     const why = params.reason?.trim() || fallbackBuyReason(candidate.symbol);
-    recordOpenBuy(candidate.symbol, candidate.name, candidate.mint, why, buySolUsed, tokenAmount, buyTimestamp, txBuy, mcapUsd ?? undefined);
+    recordOpenBuy(candidate.symbol, candidate.name, candidate.mint, why, amountSol, tokenAmount, buyTimestamp, txBuy, mcapUsd ?? undefined);
     appendLog({
       type: "bought",
       symbol: candidate.symbol,
@@ -301,7 +274,7 @@ export async function buy(params: BuyParams): Promise<{ ok: true; symbol: string
       holderStats?.holderCount,
       why
     );
-    postChudTweetBuy(candidate.symbol, buySolUsed, params.reason);
+    postChudTweetBuy(candidate.symbol, amountSol, params.reason);
     return { ok: true, symbol: candidate.symbol, tx: txBuy };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

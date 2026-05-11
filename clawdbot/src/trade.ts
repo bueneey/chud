@@ -70,8 +70,8 @@ export function isPlaceholderBuyTokenAmount(buySol: number, buyTokenAmount: numb
 
 /** Wait until signature is processed; throw if chain reports `err` or timeout. */
 async function confirmSignatureSucceededOrThrow(conn: Connection, signature: string): Promise<void> {
-  const timeoutMs = 90_000;
-  const pollMs = 450;
+  const timeoutMs = Math.min(120_000, Math.max(8_000, Number(process.env.CHUD_TX_CONFIRM_MS ?? "45000") || 45_000));
+  const pollMs = 400;
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     const { value } = await conn.getSignatureStatuses([signature], { searchTransactionHistory: true });
@@ -255,8 +255,8 @@ async function fetchSerializedTx(params: {
   return raw;
 }
 
-/** `pump` + `auto` build for fresh bonding-curve mints; `pump-amm`/`raydium` often HTTP 400 until migrated. */
-const DEFAULT_BUY_POOL_FALLBACKS = "pump,auto,bonk,launchlab,raydium-cpmm,pump-amm,raydium";
+/** Default: only `pump` + `auto` (bonding curve). Longer lists multiply on-chain attempts and feel “hung”. Override via CHUD_BUY_POOL_FALLBACKS for graduated names. */
+const DEFAULT_BUY_POOL_FALLBACKS = "pump,auto";
 
 function buyPoolFallbackList(): string[] {
   const raw = process.env.CHUD_BUY_POOL_FALLBACKS?.trim() || DEFAULT_BUY_POOL_FALLBACKS;
