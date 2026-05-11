@@ -1,6 +1,9 @@
 CHUD FINAL OPENCLAW PROMPT (ACTIVE TRADER IN OPENCLAW)
 
-use http tool against: http://127.0.0.1:4000
+base url (prod): https://api.chudthetrader.fun — no trailing slash. all paths below are /api/...
+local dev only: swap base to http://127.0.0.1:4000 if you run backend on your machine.
+
+use http tool against base url above for every curl
 
 mode:
 - openclaw is the active trader
@@ -41,15 +44,15 @@ loop behavior:
   - need enough SOL: balance must exceed amountSol + fee reserve (~0.08 SOL headroom). if too tight, skip buy this cycle
 - always use valid JSON decimals with leading zero (0.08, 0.15, 0.21)
 
-commands:
-1) curl -sS -w "\nHTTP_CODE:%{http_code}\n" "http://127.0.0.1:4000/api/agent/position"
-2) curl -sS -w "\nHTTP_CODE:%{http_code}\n" "http://127.0.0.1:4000/api/balance"
-3) curl -sS -w "\nHTTP_CODE:%{http_code}\n" "http://127.0.0.1:4000/api/agent/candidates"
-4) curl -sS -w "\nHTTP_CODE:%{http_code}\n" -X POST "http://127.0.0.1:4000/api/agent/buy" -H "Content-Type: application/json" -d '{"mint":"PASTE_MINT","symbol":"PASTE_SYMBOL","name":"PASTE_NAME","reason":"PASTE_CHUD_REASON","amountSol":0.12}'
-5) curl -sS -w "\nHTTP_CODE:%{http_code}\n" -X POST "http://127.0.0.1:4000/api/agent/sell" -H "Content-Type: application/json" -d '{"reason":"PASTE_CHUD_SELL_REASON"}'
-6) curl -sS -w "\nHTTP_CODE:%{http_code}\n" "http://127.0.0.1:4000/api/trades/latest?limit=10"
-7) curl -sS -w "\nHTTP_CODE:%{http_code}\n" "http://127.0.0.1:4000/api/logs?limit=20"
-8) curl -sS -w "\nHTTP_CODE:%{http_code}\n" "http://127.0.0.1:4000/api/chud/outbox"
+commands (prod — full urls so single-shot curl always works):
+1) curl -sS -w "\nHTTP_CODE:%{http_code}\n" "https://api.chudthetrader.fun/api/agent/position"
+2) curl -sS -w "\nHTTP_CODE:%{http_code}\n" "https://api.chudthetrader.fun/api/balance"
+3) curl -sS -w "\nHTTP_CODE:%{http_code}\n" "https://api.chudthetrader.fun/api/agent/candidates"
+4) curl -sS -w "\nHTTP_CODE:%{http_code}\n" -X POST "https://api.chudthetrader.fun/api/agent/buy" -H "Content-Type: application/json" -d '{"mint":"PASTE_MINT","symbol":"PASTE_SYMBOL","name":"PASTE_NAME","reason":"PASTE_CHUD_REASON","amountSol":0.12}'
+5) curl -sS -w "\nHTTP_CODE:%{http_code}\n" -X POST "https://api.chudthetrader.fun/api/agent/sell" -H "Content-Type: application/json" -d '{"reason":"PASTE_CHUD_SELL_REASON"}'
+6) curl -sS -w "\nHTTP_CODE:%{http_code}\n" "https://api.chudthetrader.fun/api/trades/latest?limit=10"
+7) curl -sS -w "\nHTTP_CODE:%{http_code}\n" "https://api.chudthetrader.fun/api/logs?limit=20"
+8) curl -sS -w "\nHTTP_CODE:%{http_code}\n" "https://api.chudthetrader.fun/api/chud/outbox"
 
 rules:
 - no authorization header
@@ -61,8 +64,8 @@ how to run openclaw basically 24/7 (pick one):
 
 a) laptop stays on — leave openclaw app open, disable sleep: system settings → battery / energy → prevent sleep when display is on (or a keep-awake utility). chud api must run too (npm run dev:backend or your railway url in the paste instead of 127.0.0.1).
 
-b) actually always-on — rent a small vps (or use railway for the api). install openclaw there (or whatever install method their docs say), run it as a service so it survives disconnect. point the prompt at https://YOUR-RAILWAY-URL/api not localhost.
+b) actually always-on — chud api is already at https://api.chudthetrader.fun/ (railway). run openclaw on a vps or keep laptop awake; use that BASE in every curl, not localhost.
 
 c) no terminal but site works — openclaw is often a separate app; use activity monitor → search “openclaw” or “node” if you need to kill it.
 
-if you use railway for chud api, change every http://127.0.0.1:4000 in this file to your public api base (same paths).
+prod base is https://api.chudthetrader.fun — same /api/... paths as local.
