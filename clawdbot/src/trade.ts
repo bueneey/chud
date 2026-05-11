@@ -1,5 +1,5 @@
 import type { TradeRecord, CandidateCoin, Filters } from "./types.js";
-import { appendTrade } from "./storage.js";
+import { appendTrade, appendLog } from "./storage.js";
 import { Connection, Keypair, VersionedTransaction, PublicKey, type ParsedAccountData } from "@solana/web3.js";
 import { loadKeypair } from "./wallet.js";
 
@@ -127,6 +127,34 @@ async function readWalletTokenUiAmountWithRetry(
   return 0;
 }
 
+function normalizePumpPortalField(raw: string): string {
+  return raw.normalize("NFKC").replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
+}
+
+function assertPumpPortalPubkeys(publicKey: string, mint: string): void {
+  try {
+    new PublicKey(publicKey);
+    new PublicKey(mint);
+  } catch {
+    throw new Error(
+      `Invalid Solana publicKey or mint for PumpPortal (bad paste / encoding?). pubkeyLen=${publicKey.length} mintLen=${mint.length}`
+    );
+  }
+}
+
+function portalErrorMessage(buf: Uint8Array): string {
+  const text = new TextDecoder().decode(buf);
+  const trimmed = text.trimStart();
+  let msg = text.slice(0, 800);
+  try {
+    const j = JSON.parse(trimmed) as { error?: { message?: string; code?: number }; message?: string };
+    msg = j.error?.message ?? j.message ?? msg;
+  } catch {
+    /* keep plain text e.g. "Bad Request" */
+  }
+  return msg;
+}
+
 async function fetchSerializedTx(params: {
   publicKey: string;
   action: "buy" | "sell";
@@ -137,59 +165,98 @@ async function fetchSerializedTx(params: {
   priorityFee: number;
   pool: string;
 }): Promise<ArrayBuffer> {
-  const body = new URLSearchParams({
-    publicKey: params.publicKey,
+  const publicKey = normalizePumpPortalField(params.publicKey);
+  const mint = normalizePumpPortalField(params.mint);
+  assertPumpPortalPubkeys(publicKey, mint);
+
+  const url = pumpPortalTradeLocalUrl();
+  const fetchMs = Math.min(120_000, Math.max(12_000, Number(process.env.CHUD_PUMPPORTAL_FETCH_MS ?? "45000") || 45_000));
+
+  const amountJson: string | number =
+    params.denominatedInSol === "true" ? Math.floor(Number(params.amount)) : params.amount;
+  if (params.denominatedInSol === "true" && (!Number.isFinite(amountJson as number) || (amountJson as number) <= 0)) {
+    throw new Error(`PumpPortal buy invalid SOL lamports amount: ${params.amount}`);
+  }
+
+  const formBody = new URLSearchParams({
+    publicKey,
     action: params.action,
-    mint: params.mint,
+    mint,
     amount: params.amount,
     denominatedInSol: params.denominatedInSol,
     slippage: String(params.slippage),
     priorityFee: String(params.priorityFee),
     pool: params.pool,
   });
-  const url = pumpPortalTradeLocalUrl();
-  const fetchMs = Math.min(120_000, Math.max(12_000, Number(process.env.CHUD_PUMPPORTAL_FETCH_MS ?? "45000") || 45_000));
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Accept: "application/octet-stream, application/json;q=0.9, */*;q=0.8",
-      "User-Agent": "ChudTheTrader/1.0",
-    },
-    body: body.toString(),
-    signal: AbortSignal.timeout(fetchMs),
-  });
-  const raw = await res.arrayBuffer();
-  const buf = new Uint8Array(raw);
-  const looksJson = buf.length > 0 && buf[0] === 0x7b; // '{'
+
+  const jsonBody = {
+    publicKey,
+    action: params.action,
+    mint,
+    amount: amountJson,
+    denominatedInSol: params.denominatedInSol,
+    slippage: params.slippage,
+    priorityFee: params.priorityFee,
+    pool: params.pool,
+  };
+
+  const headersBase = { Accept: "application/octet-stream, application/json;q=0.9, */*;q=0.8" as const };
+
+  async function postPortal(encoding: "form" | "json"): Promise<{ res: Response; raw: ArrayBuffer }> {
+    const res = await fetch(url, {
+      method: "POST",
+      headers:
+        encoding === "form"
+          ? { ...headersBase, "Content-Type": "application/x-www-form-urlencoded" }
+          : { ...headersBase, "Content-Type": "application/json" },
+      body: encoding === "form" ? formBody.toString() : JSON.stringify(jsonBody),
+      signal: AbortSignal.timeout(fetchMs),
+    });
+    const raw = await res.arrayBuffer();
+    return { res, raw };
+  }
+
+  let { res, raw } = await postPortal("form");
+  let buf = new Uint8Array(raw);
+  let looksJson = buf.length > 0 && buf[0] === 0x7b;
+
   if (!res.ok || looksJson) {
-    const text = new TextDecoder().decode(buf);
-    const trimmed = text.trimStart();
-    let msg = text.slice(0, 800);
-    try {
-      const j = JSON.parse(trimmed) as { error?: { message?: string; code?: number }; message?: string };
-      msg = j.error?.message ?? j.message ?? msg;
-    } catch {
-      /* keep msg */
+    let msg = portalErrorMessage(buf);
+    const retryJson =
+      res.status === 400 &&
+      (/^Bad Request$/i.test(msg.trim()) || msg.trim().length === 0 || /^unexpected/i.test(msg));
+    if (retryJson) {
+      ({ res, raw } = await postPortal("json"));
+      buf = new Uint8Array(raw);
+      looksJson = buf.length > 0 && buf[0] === 0x7b;
+      msg = portalErrorMessage(buf);
     }
-    let hint = "";
-    if (/missing api key|32401/i.test(msg)) {
-      hint =
-        " Fix: put your RPC provider’s key in SOLANA_RPC_URL (e.g. Helius …?api-key=…) and/or set PUMPPORTAL_API_KEY from https://www.pumpportal.fun/trading-api/setup/ — Chud’s agent API does not use this key.";
-    } else if (res.status === 400 && isPumpPortalKeyAppendedToTradeLocal()) {
-      hint =
-        " Hint: `?api-key=` on trade-local is for keys Portal allows with YOUR signing wallet. Lightning-wallet keys usually only match `/api/trade`. Unset PUMPPORTAL_APPEND_KEY_TO_TRADE_LOCAL (default) to call trade-local without a query key.";
-    } else if (res.status === 400) {
-      hint =
-        " Hint: mint may not support this pool yet, or Portal rejected the request — try another candidate or pool list (CHUD_BUY_POOL_FALLBACKS).";
+
+    if (!res.ok || looksJson) {
+      appendLog({
+        type: "error",
+        message: `PumpPortal ${params.action} HTTP ${res.status} pool=${params.pool} mint=${mint.slice(0, 8)}… ${msg.slice(0, 280)}`,
+        symbol: mint.slice(0, 12),
+      });
+      let hint = "";
+      if (/missing api key|32401/i.test(msg)) {
+        hint =
+          " Fix: put your RPC provider’s key in SOLANA_RPC_URL (e.g. Helius …?api-key=…) and/or set PUMPPORTAL_API_KEY from https://www.pumpportal.fun/trading-api/setup/ — Chud’s agent API does not use this key.";
+      } else if (res.status === 400 && isPumpPortalKeyAppendedToTradeLocal()) {
+        hint =
+          " Hint: `?api-key=` on trade-local is for keys Portal allows with YOUR signing wallet. Lightning-wallet keys usually only match `/api/trade`. Unset PUMPPORTAL_APPEND_KEY_TO_TRADE_LOCAL (default).";
+      } else if (res.status === 400) {
+        hint =
+          ` Hint: pool=${params.pool} often 400s for bonding-curve mints (try CHUD_BUY_POOL_FALLBACKS=pump,auto,...). Deploy latest backend; bogus mint/zw-spaces fixed server-side.`;
+      }
+      throw new Error(`PumpPortal ${params.action} (HTTP ${res.status}): ${msg}${hint}`);
     }
-    throw new Error(`PumpPortal ${params.action} (HTTP ${res.status}): ${msg}${hint}`);
   }
   return raw;
 }
 
-/** PumpPortal default is `pump`; `auto` often mis-routes and hits Pump program 6021 (notEnoughTokensToBuy). */
-const DEFAULT_BUY_POOL_FALLBACKS = "pump,pump-amm,raydium,auto,bonk,launchlab,raydium-cpmm";
+/** `pump` + `auto` build for fresh bonding-curve mints; `pump-amm`/`raydium` often HTTP 400 until migrated. */
+const DEFAULT_BUY_POOL_FALLBACKS = "pump,auto,bonk,launchlab,raydium-cpmm,pump-amm,raydium";
 
 function buyPoolFallbackList(): string[] {
   const raw = process.env.CHUD_BUY_POOL_FALLBACKS?.trim() || DEFAULT_BUY_POOL_FALLBACKS;

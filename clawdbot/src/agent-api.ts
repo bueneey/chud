@@ -57,6 +57,32 @@ export interface BuyParams {
   amountSol?: number;
 }
 
+const ZWSP = /[\u200B-\u200D\uFEFF]/g;
+
+function normalizeAgentStr(raw: unknown): string {
+  if (raw == null) return "";
+  return String(raw).normalize("NFKC").replace(ZWSP, "").trim();
+}
+
+/** Validates POST /api/agent/buy JSON (trim / strip zw-spaces so PumpPortal gets a real mint). */
+export function sanitizeAgentBuyBody(body: unknown): BuyParams | { error: string } {
+  if (body == null || typeof body !== "object") return { error: "Request body must be a JSON object" };
+  const b = body as Record<string, unknown>;
+  const mint = normalizeAgentStr(b.mint);
+  const symbol = normalizeAgentStr(b.symbol);
+  const name = normalizeAgentStr(b.name);
+  if (!mint || !symbol || !name) return { error: "Missing mint, symbol, or name (after trim)" };
+  const reasonRaw = b.reason;
+  const reason = typeof reasonRaw === "string" ? normalizeAgentStr(reasonRaw) : undefined;
+  let amountSol: number | undefined;
+  if (b.amountSol !== undefined && b.amountSol !== null) {
+    const n = typeof b.amountSol === "number" ? b.amountSol : Number(b.amountSol);
+    if (!Number.isFinite(n) || n <= 0) return { error: "Invalid amountSol (must be a positive number)" };
+    amountSol = n;
+  }
+  return { mint, symbol, name, reason: reason || undefined, amountSol };
+}
+
 function fallbackBuyReason(symbol: string): string {
   return `uhh i bought $${symbol} because it looked funny and my brain said yes`;
 }
@@ -182,6 +208,14 @@ export async function forceClosePosition(params: {
 }
 
 export async function buy(params: BuyParams): Promise<{ ok: true; symbol: string; tx?: string } | { ok: false; error: string }> {
+  const mint = normalizeAgentStr(params.mint);
+  const symbol = normalizeAgentStr(params.symbol);
+  const name = normalizeAgentStr(params.name);
+  if (!mint || !symbol || !name) {
+    return { ok: false, error: "Missing mint, symbol, or name (after trim)" };
+  }
+  params = { ...params, mint, symbol, name };
+
   const open = getOpenTrade();
   if (open) {
     return { ok: false, error: `Already in position: ${open.symbol}. Sell first.` };

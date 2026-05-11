@@ -11,6 +11,7 @@ import express from "express";
 import cors from "cors";
 import { getPublicKeyBase58 } from "clawdbot/wallet";
 import { readChudOutbox, writeChudOutbox } from "./clawdbot-outbox.js";
+import { sanitizeAgentBuyBody } from "./clawdbot-sanitize-buy.js";
 import { getTrades, getState, getFilters, getLogs } from "./data.js";
 
 const app = express();
@@ -194,11 +195,11 @@ app.get("/api/agent/position", async (_req, res) => {
 app.post("/api/agent/buy", async (req, res) => {
   try {
     const { buy: agentBuy } = await import("clawdbot/agent");
-    const { mint, symbol, name, reason, amountSol } = req.body || {};
-    if (!mint || !symbol || !name) {
-      return res.status(400).json({ ok: false, error: "Missing mint, symbol, or name" });
+    const parsed = sanitizeAgentBuyBody(req.body);
+    if ("error" in parsed) {
+      return res.status(400).json({ ok: false, error: parsed.error });
     }
-    const result = await agentBuy({ mint, symbol, name, reason, amountSol });
+    const result = await agentBuy(parsed);
     res.json(result);
   } catch (e) {
     console.error("[Backend] Agent buy error:", e);
