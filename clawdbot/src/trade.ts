@@ -1,6 +1,6 @@
 import type { TradeRecord, CandidateCoin, Filters } from "./types.js";
 import { appendTrade } from "./storage.js";
-import { Connection, Keypair, VersionedTransaction } from "@solana/web3.js";
+import { Connection, Keypair, VersionedTransaction, PublicKey, type ParsedAccountData } from "@solana/web3.js";
 import { loadKeypair } from "./wallet.js";
 
 const LAMPORTS_PER_SOL = 1e9;
@@ -36,6 +36,73 @@ function pumpPortalTradeLocalUrl(): string {
 
 function genId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2);
+}
+
+/** True when `buyTokenAmount` is the legacy lamports-shaped placeholder (≈ buySol × 1e9), not SPL ui amount. */
+export function isPlaceholderBuyTokenAmount(buySol: number, buyTokenAmount: number): boolean {
+  if (!Number.isFinite(buySol) || !Number.isFinite(buyTokenAmount) || buyTokenAmount <= 0) return false;
+  const lam = Math.round(buySol * LAMPORTS_PER_SOL);
+  return Math.abs(buyTokenAmount - lam) <= 1;
+}
+
+/** Wait until signature is processed; throw if chain reports `err` or timeout. */
+async function confirmSignatureSucceededOrThrow(conn: Connection, signature: string): Promise<void> {
+  const timeoutMs = 90_000;
+  const pollMs = 450;
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const { value } = await conn.getSignatureStatuses([signature], { searchTransactionHistory: true });
+    const st = value[0];
+    if (st?.err) {
+      const errStr = typeof st.err === "object" ? JSON.stringify(st.err) : String(st.err);
+      throw new Error(`Transaction failed on-chain (${signature.slice(0, 12)}…): ${errStr}`);
+    }
+    if (
+      st?.confirmationStatus === "processed" ||
+      st?.confirmationStatus === "confirmed" ||
+      st?.confirmationStatus === "finalized"
+    ) {
+      return;
+    }
+    await new Promise((r) => setTimeout(r, pollMs));
+  }
+  throw new Error(`Confirmation timeout for ${signature.slice(0, 12)}…`);
+}
+
+/** Sum SPL token ui amount for `mint` across the wallet’s parsed token accounts. */
+async function readWalletTokenUiAmount(conn: Connection, owner: PublicKey, mint: string): Promise<number> {
+  const mintPk = new PublicKey(mint);
+  const { value: accounts } = await conn.getParsedTokenAccountsByOwner(owner, { mint: mintPk }, "confirmed");
+  let sum = 0;
+  for (const row of accounts) {
+    const data = row.account.data as ParsedAccountData;
+    if (data.program !== "spl-token") continue;
+    const info = data.parsed?.info as
+      | { mint?: string; tokenAmount?: { uiAmount?: number | null; amount?: string; decimals?: number } }
+      | undefined;
+    if (!info?.mint || info.mint !== mint) continue;
+    const ta = info.tokenAmount;
+    if (ta?.uiAmount != null && Number.isFinite(ta.uiAmount)) {
+      sum += ta.uiAmount;
+    } else if (ta?.amount != null && ta.decimals != null) {
+      sum += Number(ta.amount) / 10 ** ta.decimals;
+    }
+  }
+  return sum;
+}
+
+async function readWalletTokenUiAmountWithRetry(
+  conn: Connection,
+  owner: PublicKey,
+  mint: string,
+  opts: { attempts: number; delayMs: number }
+): Promise<number> {
+  for (let i = 0; i < opts.attempts; i++) {
+    const n = await readWalletTokenUiAmount(conn, owner, mint);
+    if (n > 0) return n;
+    if (i + 1 < opts.attempts) await new Promise((r) => setTimeout(r, opts.delayMs));
+  }
+  return 0;
 }
 
 async function fetchSerializedTx(params: {
@@ -136,9 +203,19 @@ export async function executeBuy(
       throw e;
     }
   }
-  /** Placeholder until we parse mint balance from chain; huge values break PnL math in quotes. */
-  const tokenAmount = Math.max(1, Math.min(1e15, Math.round(solAmount * 1e9)));
-  return { tokenAmount, tx: sig! };
+
+  await confirmSignatureSucceededOrThrow(conn, sig!);
+
+  const tokenUi = await readWalletTokenUiAmountWithRetry(conn, keypair.publicKey, candidate.mint, {
+    attempts: 12,
+    delayMs: 750,
+  });
+  if (!(tokenUi > 0)) {
+    throw new Error(
+      `Buy transaction confirmed but wallet still shows 0 ${candidate.symbol} (${candidate.mint.slice(0, 8)}…) — check RPC / mint, or retry.`
+    );
+  }
+  return { tokenAmount: tokenUi, tx: sig! };
 }
 
 export async function executeSell(
@@ -213,8 +290,7 @@ export async function executeSell(
     }
   }
 
-  const { blockhash, lastValidBlockHeight } = await conn.getLatestBlockhash("confirmed");
-  await conn.confirmTransaction({ signature: sig!, blockhash, lastValidBlockHeight }, "confirmed");
+  await confirmSignatureSucceededOrThrow(conn, sig!);
 
   const balAfter = await conn.getBalance(keypair.publicKey);
   const solReceived = Math.max(0, (balAfter - balBefore) / LAMPORTS_PER_SOL);

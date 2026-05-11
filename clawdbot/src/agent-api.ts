@@ -14,7 +14,13 @@ if (envPath) config({ path: envPath });
 import type { CandidateCoin } from "./types.js";
 import { loadFilters, getChudOwnTokenMint } from "./config.js";
 import { discoverCandidates } from "./discovery.js";
-import { executeBuy, executeSell, recordOpenBuy, getWalletBalanceSol } from "./trade.js";
+import {
+  executeBuy,
+  executeSell,
+  recordOpenBuy,
+  getWalletBalanceSol,
+  isPlaceholderBuyTokenAmount,
+} from "./trade.js";
 import {
   getState,
   getOpenTrade,
@@ -91,6 +97,20 @@ export async function getPositionWithQuote(): Promise<AgentPosition & { quote?: 
   if (!open || !open.buyTokenAmount || open.buyTokenAmount <= 0) return pos;
   const buyTimestamp = open.buyTimestamp ? new Date(open.buyTimestamp).getTime() : Date.now();
   const holdSeconds = Math.round((Date.now() - buyTimestamp) / 1000);
+  /** Legacy lamports-shaped placeholder broke PnL (buySol×1e9 × priceUsd). */
+  if (isPlaceholderBuyTokenAmount(open.buySol, open.buyTokenAmount)) {
+    const currentPriceUsd = await getTokenPriceUsd(open.mint);
+    return {
+      ...pos,
+      quote: {
+        currentPriceUsd: currentPriceUsd && currentPriceUsd > 0 ? currentPriceUsd : null,
+        unrealizedPnlPercent: null,
+        unrealizedPnlSol: null,
+        buyPriceUsd: null,
+        holdSeconds,
+      },
+    };
+  }
   /** Recorded token amount is often a rough placeholder; absurd values make PnL meaningless. */
   if (open.buyTokenAmount > 1e11) {
     const currentPriceUsd = await getTokenPriceUsd(open.mint);
@@ -119,7 +139,7 @@ export async function getPositionWithQuote(): Promise<AgentPosition & { quote?: 
     !Number.isFinite(unrealizedPnlPercent) ||
     !Number.isFinite(unrealizedPnlSol) ||
     Math.abs(unrealizedPnlPercent) > 50000 ||
-    Math.abs(unrealizedPnlSol) > 200 ||
+    Math.abs(unrealizedPnlSol) > 50 ||
     (buyPriceUsd > 0 && buyPriceUsd < 1e-10)
   ) {
     return {

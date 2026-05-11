@@ -10,6 +10,7 @@ if (envPath) config({ path: envPath });
 import express from "express";
 import cors from "cors";
 import { getPublicKeyBase58 } from "clawdbot/wallet";
+import { readChudOutbox, writeChudOutbox } from "./clawdbot-outbox.js";
 import { getTrades, getState, getFilters, getLogs } from "./data.js";
 
 const app = express();
@@ -305,7 +306,6 @@ app.post("/api/chat/clear", async (_req, res) => {
 
 app.get("/api/chud/outbox", async (_req, res) => {
   try {
-    const { readChudOutbox } = await import("clawdbot/outbox");
     const o = readChudOutbox();
     if (!o) {
       return res.json({
@@ -317,6 +317,19 @@ app.get("/api/chud/outbox", async (_req, res) => {
     res.json(o);
   } catch (e) {
     res.status(503).json({ error: "outbox unavailable", detail: String(e) });
+  }
+});
+
+app.post("/api/chud/outbox", async (req, res) => {
+  try {
+    const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
+    if (!text) {
+      return res.status(400).json({ ok: false, error: "JSON body { \"text\": \"...\" } required" });
+    }
+    writeChudOutbox(text);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(503).json({ ok: false, error: String(e) });
   }
 });
 

@@ -9,10 +9,10 @@ const FILE = "chud-outbox.json";
 
 export type ChudOutbox = { text: string; at: string };
 
-export function writeChudOutbox(text: string): void {
+export const writeChudOutbox = (text: string): void => {
   const payload: ChudOutbox = { text: text.trim(), at: new Date().toISOString() };
   writeFileSync(join(getDataDir(), FILE), JSON.stringify(payload, null, 0), "utf-8");
-}
+};
 
 export function readChudOutbox(): ChudOutbox | null {
   const p = join(getDataDir(), FILE);
