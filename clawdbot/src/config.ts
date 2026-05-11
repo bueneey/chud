@@ -49,7 +49,7 @@ export function getDataDir(): string {
 
 export const DEMO_MODE = process.env.DEMO_MODE === "true" || !process.env.SOLANA_RPC_URL;
 
-/** Chud's own token mint—bot will never buy or sell it. Set CHUD_OWN_TOKEN_MINT in .env */
+/** Chud's own token mint—bot will never buy or sell it. Set CHUD_OWN_TOKEN_MINT in .env (legacy: LOBBI_OWN_TOKEN_MINT). */
 export function getChudOwnTokenMint(): string {
-  return (process.env.CHUD_OWN_TOKEN_MINT || "").trim();
+  return (process.env.CHUD_OWN_TOKEN_MINT || process.env.LOBBI_OWN_TOKEN_MINT || "").trim();
 }

@@ -161,7 +161,10 @@ app.get("/api/wallet-status", async (_req, res) => {
   }
 });
 
-const CHUD_AGENT_BASE = process.env.CHUD_AGENT_BASE_URL || "http://localhost:4000";
+const CHUD_AGENT_BASE =
+  process.env.CHUD_AGENT_BASE_URL?.trim() ||
+  process.env.LOBBI_AGENT_BASE_URL?.trim() ||
+  "http://localhost:4000";
 
 app.get("/api/agent/candidates", async (_req, res) => {
   try {
