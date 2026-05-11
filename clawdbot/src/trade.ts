@@ -173,9 +173,9 @@ async function fetchSerializedTx(params: {
   const fetchMs = Math.min(120_000, Math.max(12_000, Number(process.env.CHUD_PUMPPORTAL_FETCH_MS ?? "45000") || 45_000));
 
   const amountJson: string | number =
-    params.denominatedInSol === "true" ? Math.floor(Number(params.amount)) : params.amount;
+    params.denominatedInSol === "true" ? Number(params.amount) : params.amount;
   if (params.denominatedInSol === "true" && (!Number.isFinite(amountJson as number) || (amountJson as number) <= 0)) {
-    throw new Error(`PumpPortal buy invalid SOL lamports amount: ${params.amount}`);
+    throw new Error(`PumpPortal buy invalid SOL amount: ${params.amount}`);
   }
 
   const formBody = new URLSearchParams({
@@ -318,7 +318,7 @@ export async function executeBuy(
     return { tokenAmount, tx: "demo_buy_" + genId() };
   }
 
-  const amountLamports = Math.floor(solAmount * 1e9);
+  const amountSolText = Number(solAmount.toFixed(6)).toString();
   const conn = new Connection(rpc);
   const pools = buyPoolFallbackList();
   let lastErr: Error | null = null;
@@ -331,7 +331,7 @@ export async function executeBuy(
         publicKey: keypair.publicKey.toBase58(),
         action: "buy",
         mint: candidate.mint,
-        amount: String(amountLamports),
+        amount: amountSolText,
         denominatedInSol: "true",
         slippage: filters.slippagePercent ?? 15,
         priorityFee: filters.priorityFeeSol ?? 0.0001,
