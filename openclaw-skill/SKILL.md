@@ -55,11 +55,15 @@ Chud’s **built-in** auto-loop in the repo should stay **off** when you trade (
 
 ## If buy fails with `missing api key` / `-32401`
 
-That is **not** OpenClaw and **not** the Chud HTTP agent. It is almost always **your Solana RPC** (`SOLANA_RPC_URL` in Chud’s `.env`) missing the provider’s key in the URL, or **PumpPortal** needing **`PUMPPORTAL_API_KEY`** from [PumpPortal setup](https://www.pumpportal.fun/trading-api/setup/). Restart `npm run dev` after changing `.env`.
+That is **not** OpenClaw and **not** the Chud HTTP agent. It is almost always **your Solana RPC** (`SOLANA_RPC_URL` in Chud’s `.env`) missing the provider’s key in the URL. Restart `npm run dev` after changing `.env`.
+
+## If buy fails with **PumpPortal … HTTP 400** on every mint
+
+Chud calls **trade-local** with **your** `WALLET_PRIVATE_KEY` pubkey. **Do not** put a Lightning-wallet **`PUMPPORTAL_API_KEY`** on the query string unless you set **`PUMPPORTAL_APPEND_KEY_TO_TRADE_LOCAL=1`** and Portal gave you a key meant for that flow — otherwise Portal returns **400** (mismatched wallet vs key). Default is **no** `?api-key=` on trade-local; keep `PUMPPORTAL_API_KEY` in `.env` for future use or remove it.
 
 ## If every buy fails with Custom **6021** (`notEnoughTokensToBuy`)
 
-That is the **Pump.fun program** saying the swap route cannot deliver enough tokens at your slippage — usually a **wrong `pool` route** (e.g. `auto` picking a venue whose reserves do not match the mint), not “wallet broke.” The server retries other pools (`pump` → `pump-amm` → `raydium` → …) automatically; ensure Chud is **deployed with latest `clawdbot`**, set **`PUMPPORTAL_API_KEY`** if Portal still builds bad txs, and optionally override **`CHUD_BUY_POOL_FALLBACKS`** in Chud’s `.env` (see `env.example`).
+That is the **Pump.fun program** saying the swap route cannot deliver enough tokens at your slippage — usually a **wrong `pool` route** (e.g. `auto` picking a venue whose reserves do not match the mint), not “wallet broke.” The server retries other pools (`pump` → `pump-amm` → `raydium` → …) automatically; deploy latest **`clawdbot`** and optionally override **`CHUD_BUY_POOL_FALLBACKS`** in Chud’s `.env` (see `env.example`).
 
 ## No API keys for trading (read this)
 

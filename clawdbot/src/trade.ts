@@ -27,16 +27,34 @@ export async function getWalletBalanceWithError(): Promise<{ balance: number | n
   }
 }
 
+/**
+ * PumpPortal **trade-local** signs with YOUR wallet (`publicKey` in the form body).
+ * API keys from the “Lightning wallet” flow are for **`/api/trade`** (Portal signs that wallet), not for pairing
+ * with a different pubkey on trade-local — sending `?api-key=` + mismatched wallet → **HTTP 400**.
+ * Opt in only if you have a key Portal documents for local tx: `PUMPPORTAL_APPEND_KEY_TO_TRADE_LOCAL=1`.
+ */
 function pumpPortalTradeLocalUrl(): string {
   const base = "https://pumpportal.fun/api/trade-local";
   const key = (process.env.PUMPPORTAL_API_KEY || process.env.PUMP_FUN_API_KEY || "").trim();
-  if (key) return `${base}?api-key=${encodeURIComponent(key)}`;
+  const append =
+    process.env.PUMPPORTAL_APPEND_KEY_TO_TRADE_LOCAL === "1" ||
+    process.env.PUMPPORTAL_USE_KEY_ON_TRADE_LOCAL === "1";
+  if (key && append) return `${base}?api-key=${encodeURIComponent(key)}`;
   return base;
 }
 
-/** True when `PUMPPORTAL_API_KEY` (or legacy `PUMP_FUN_API_KEY`) is set — Portal appends `?api-key=` on trade-local. */
+/** True when a PumpPortal key is present in env (may or may not be sent on trade-local — see append flag). */
 export function isPumpPortalApiKeyConfigured(): boolean {
-  return !!(process.env.PUMPPORTAL_API_KEY || process.env.PUMP_FUN_API_KEY)?.trim();
+  return (process.env.PUMPPORTAL_API_KEY || process.env.PUMP_FUN_API_KEY || "").trim().length > 0;
+}
+
+export function isPumpPortalKeyAppendedToTradeLocal(): boolean {
+  const key = (process.env.PUMPPORTAL_API_KEY || process.env.PUMP_FUN_API_KEY || "").trim();
+  if (!key) return false;
+  return (
+    process.env.PUMPPORTAL_APPEND_KEY_TO_TRADE_LOCAL === "1" ||
+    process.env.PUMPPORTAL_USE_KEY_ON_TRADE_LOCAL === "1"
+  );
 }
 
 function genId(): string {
@@ -130,7 +148,7 @@ async function fetchSerializedTx(params: {
     pool: params.pool,
   });
   const url = pumpPortalTradeLocalUrl();
-  const fetchMs = Math.min(120_000, Math.max(15_000, Number(process.env.CHUD_PUMPPORTAL_FETCH_MS ?? "90000") || 90_000));
+  const fetchMs = Math.min(120_000, Math.max(12_000, Number(process.env.CHUD_PUMPPORTAL_FETCH_MS ?? "45000") || 45_000));
   const res = await fetch(url, {
     method: "POST",
     headers: {
@@ -154,10 +172,17 @@ async function fetchSerializedTx(params: {
     } catch {
       /* keep msg */
     }
-    const hint =
-      /missing api key|32401/i.test(msg)
-        ? " Fix: put your RPC provider’s key in SOLANA_RPC_URL (e.g. Helius …?api-key=…) and/or set PUMPPORTAL_API_KEY from https://www.pumpportal.fun/trading-api/setup/ — Chud’s agent API does not use this key."
-        : "";
+    let hint = "";
+    if (/missing api key|32401/i.test(msg)) {
+      hint =
+        " Fix: put your RPC provider’s key in SOLANA_RPC_URL (e.g. Helius …?api-key=…) and/or set PUMPPORTAL_API_KEY from https://www.pumpportal.fun/trading-api/setup/ — Chud’s agent API does not use this key.";
+    } else if (res.status === 400 && isPumpPortalKeyAppendedToTradeLocal()) {
+      hint =
+        " Hint: `?api-key=` on trade-local is for keys Portal allows with YOUR signing wallet. Lightning-wallet keys usually only match `/api/trade`. Unset PUMPPORTAL_APPEND_KEY_TO_TRADE_LOCAL (default) to call trade-local without a query key.";
+    } else if (res.status === 400) {
+      hint =
+        " Hint: mint may not support this pool yet, or Portal rejected the request — try another candidate or pool list (CHUD_BUY_POOL_FALLBACKS).";
+    }
     throw new Error(`PumpPortal ${params.action} (HTTP ${res.status}): ${msg}${hint}`);
   }
   return raw;

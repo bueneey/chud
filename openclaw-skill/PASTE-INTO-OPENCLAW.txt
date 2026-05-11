@@ -3,7 +3,7 @@ CHUD FINAL OPENCLAW PROMPT (ACTIVE TRADER IN OPENCLAW)
 base url (prod): https://api.chudthetrader.fun — no trailing slash. all paths below are /api/...
 local dev only: swap base to http://127.0.0.1:4000 if you run backend on your machine.
 
-railway / server .env (chud backend, not openclaw): SOLANA_RPC_URL (with provider key in url), WALLET_PRIVATE_KEY, CHUD_WALLET_PUBLIC, PUMPPORTAL_API_KEY (from pumpportal setup — strongly recommended). optional: CHUD_BUY_POOL_FALLBACKS. sanity: curl "https://api.chudthetrader.fun/api/agent/info" → pumpPortalApiKeySet should be true after deploy.
+railway / server .env (chud backend, not openclaw): SOLANA_RPC_URL (provider key in url), WALLET_PRIVATE_KEY, CHUD_WALLET_PUBLIC. do NOT set PUMPPORTAL_APPEND_KEY_TO_TRADE_LOCAL unless portal gave you a local-tx key — lightning api keys + trade-local + your wallet = HTTP 400. optional: CHUD_BUY_POOL_FALLBACKS. sanity: curl "https://api.chudthetrader.fun/api/agent/info" → pumpPortalKeyOnTradeLocal should be false unless you know you need append.
 
 use http tool against base url above for every curl
 

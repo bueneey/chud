@@ -295,5 +295,10 @@ export async function sell(params?: { reason?: string }): Promise<
   }
 }
 
-export { getWalletBalanceSol, getWalletBalanceWithError, isPumpPortalApiKeyConfigured } from "./trade.js";
+export {
+  getWalletBalanceSol,
+  getWalletBalanceWithError,
+  isPumpPortalApiKeyConfigured,
+  isPumpPortalKeyAppendedToTradeLocal,
+} from "./trade.js";
 export { getPublicKeyBase58 } from "./wallet.js";

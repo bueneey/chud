@@ -334,14 +334,20 @@ app.post("/api/chud/outbox", async (req, res) => {
 });
 
 app.get("/api/agent/info", (_req, res) => {
-  const pumpPortalApiKeySet = !!(process.env.PUMPPORTAL_API_KEY || process.env.PUMP_FUN_API_KEY)?.trim();
+  const pumpKey =
+    (process.env.PUMPPORTAL_API_KEY || process.env.PUMP_FUN_API_KEY || "").trim().length > 0;
+  const pumpPortalKeyOnTradeLocal =
+    pumpKey &&
+    (process.env.PUMPPORTAL_APPEND_KEY_TO_TRADE_LOCAL === "1" ||
+      process.env.PUMPPORTAL_USE_KEY_ON_TRADE_LOCAL === "1");
   const solanaRpcSet = !!process.env.SOLANA_RPC_URL?.trim();
   const walletPrivateKeySet = !!process.env.WALLET_PRIVATE_KEY?.trim();
   res.json({
     message:
-      "Chud agent API. GET candidates, position. POST buy / sell. POST force-close (CHUD_FORCE_CLOSE_SECRET). Buys retry pools (CHUD_BUY_POOL_FALLBACKS); sells retry (CHUD_SELL_POOL_FALLBACKS). Set PUMPPORTAL_API_KEY on the server for best PumpPortal trade-local txs.",
+      "Chud agent API. GET candidates, position. POST buy / sell. POST force-close (CHUD_FORCE_CLOSE_SECRET). Buys retry pools (CHUD_BUY_POOL_FALLBACKS); sells retry (CHUD_SELL_POOL_FALLBACKS). Trade-local calls omit ?api-key= by default (Lightning keys + external wallet → HTTP 400); set PUMPPORTAL_APPEND_KEY_TO_TRADE_LOCAL=1 only if Portal gave you a local-compatible key.",
     baseUrl: CHUD_AGENT_BASE,
-    pumpPortalApiKeySet,
+    pumpPortalApiKeySet: pumpKey,
+    pumpPortalKeyOnTradeLocal,
     solanaRpcSet,
     walletPrivateKeySet,
     endpoints: {
@@ -368,11 +374,16 @@ if (isProd) {
 import("clawdbot").catch((e) => console.error("[Backend] Clawdbot import failed:", e));
 
 app.listen(PORT, "0.0.0.0", () => {
-  const pump = !!(process.env.PUMPPORTAL_API_KEY || process.env.PUMP_FUN_API_KEY)?.trim();
+  const pumpKey =
+    (process.env.PUMPPORTAL_API_KEY || process.env.PUMP_FUN_API_KEY || "").trim().length > 0;
+  const pumpOnLocal =
+    pumpKey &&
+    (process.env.PUMPPORTAL_APPEND_KEY_TO_TRADE_LOCAL === "1" ||
+      process.env.PUMPPORTAL_USE_KEY_ON_TRADE_LOCAL === "1");
   const rpc = !!process.env.SOLANA_RPC_URL?.trim();
   const wallet = !!process.env.WALLET_PRIVATE_KEY?.trim();
   console.log(`[Backend] API on http://0.0.0.0:${PORT}${isProd ? " (serving web)" : ""}`);
   console.log(
-    `[Backend] Swaps: SOLANA_RPC_URL=${rpc ? "set" : "MISSING"} WALLET_PRIVATE_KEY=${wallet ? "set" : "MISSING"} PUMPPORTAL_API_KEY=${pump ? "set (recommended)" : "not set"}`
+    `[Backend] Swaps: SOLANA_RPC_URL=${rpc ? "set" : "MISSING"} WALLET_PRIVATE_KEY=${wallet ? "set" : "MISSING"} PUMPPORTAL key in env=${pumpKey ? "yes" : "no"} append-to-trade-local=${pumpOnLocal ? "yes" : "no (default)"}`
   );
 });
