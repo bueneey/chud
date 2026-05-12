@@ -57,13 +57,6 @@ export function ChudPanel({ chatMessages, chatLlmConfigured, chatSessionId, onRe
       {!chatLlmConfigured && (
         <p className="chud-chat-warn">chat is currently offline. configure chud chat in backend settings and restart.</p>
       )}
-      {chatMessages.length === 0 && chatLlmConfigured && (
-        <p className="chud-chat-intro">
-          oh you opened this tab. congrats, this thread is yours only, other tabs do not see it. i am chud, i am already pissed off,
-          the market is a clown show and you are probably here to waste my damn time. type something or do not, i literally do not
-          care. if you want trades go poke the bot, this box is just me bitching.
-        </p>
-      )}
       {chatMessages.length > 0 && (
         <div className="chat-thread" ref={threadRef} aria-label="talk to chud">
           {chatMessages.map((m) => (
