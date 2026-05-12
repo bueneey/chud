@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import {
-  fetchLatestTrades,
+  fetchTrades,
   fetchBalance,
   fetchPnl,
   fetchBalanceChart,
@@ -11,6 +11,7 @@ import {
   type TradeRecord,
   type ChudState,
   type BalanceChartPoint,
+  type BalanceChartMeta,
   type ChudChatTurn,
   type LogEntry,
   type ChudOutboxResponse,
@@ -36,6 +37,7 @@ export default function App() {
   const [balance, setBalance] = useState<number>(0);
   const [pnl, setPnl] = useState<number>(0);
   const [balanceChartPoints, setBalanceChartPoints] = useState<BalanceChartPoint[]>([]);
+  const [balanceChartMeta, setBalanceChartMeta] = useState<BalanceChartMeta | null>(null);
   const [state, setState] = useState<ChudState | null>(null);
   const [chatMessages, setChatMessages] = useState<ChudChatTurn[]>([]);
   const [chatLlmConfigured, setChatLlmConfigured] = useState(false);
@@ -57,7 +59,7 @@ export default function App() {
 
   function poll() {
     Promise.all([
-      fetchLatestTrades(50),
+      fetchTrades(),
       fetchBalance(),
       fetchPnl(),
       fetchBalanceChart(),
@@ -71,6 +73,7 @@ export default function App() {
         setBalance(b);
         setPnl(p.totalPnlSol);
         setBalanceChartPoints(chart.points ?? []);
+        setBalanceChartMeta(chart.meta ?? null);
         setState(s);
         setChatMessages(chat.messages);
         setChatLlmConfigured(chat.llmConfigured);
@@ -125,7 +128,7 @@ export default function App() {
         </button>
       </div>
       <header className="header">
-        <img src={isHappy ? "/chudhappy.png" : "/chudpfptbg.png"} alt="Chud the Trader" />
+        <img src="/chudpfptbg.png" alt="Chud the Trader" />
         <div className="header-titles">
           <h1>chud the trader</h1>
           <span className="header-sub">
@@ -213,10 +216,12 @@ export default function App() {
 
       <section className="balance-chart-section" aria-label="wallet balance over time">
         <h2 className="section-label">wallet balance chart</h2>
-        <p className="section-desc">balance history over time.</p>
+        <p className="section-desc">
+          full timeline: every closed trade step plus saved on-chain balance samples (same data folder as the bot). polls every few seconds.
+        </p>
         <div className="panel balance-chart-panel">
-          <div className="panel-title">[ bot wallet balance over time ]</div>
-          <WalletBalanceChart points={balanceChartPoints} />
+          <div className="panel-title">[ bot wallet balance - all time ]</div>
+          <WalletBalanceChart points={balanceChartPoints} meta={balanceChartMeta} />
         </div>
       </section>
       <section aria-label="blown port counter">
@@ -234,7 +239,10 @@ export default function App() {
       {page === "feed" && (
         <section className="feed-section" aria-label="live trade feed">
           <h2 className="section-label">live trade feed</h2>
-          <p className="section-desc">every buy and sell in time order, with reasons when available.</p>
+          <p className="section-desc">
+            full trade list from the server (polls every few seconds). use &quot;live&quot; for the last 72 hours, &quot;all past&quot; for
+            everything on file.
+          </p>
           <TradeFeed trades={trades} />
         </section>
       )}

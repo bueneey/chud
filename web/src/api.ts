@@ -96,10 +96,20 @@ export async function fetchPnl(): Promise<{ totalPnlSol: number; tradeCount: num
   return { totalPnlSol: data.totalPnlSol ?? 0, tradeCount: data.tradeCount ?? 0 };
 }
 
-export async function fetchBalanceChart(): Promise<{ points: BalanceChartPoint[] }> {
+export interface BalanceChartMeta {
+  from?: string;
+  to?: string;
+  count?: number;
+  rawCount?: number;
+}
+
+export async function fetchBalanceChart(): Promise<{ points: BalanceChartPoint[]; meta?: BalanceChartMeta }> {
   const res = await apiFetch("/balance/chart");
   const data = await res.json();
-  return { points: data.points ?? [] };
+  return {
+    points: data.points ?? [],
+    meta: data.meta as BalanceChartMeta | undefined,
+  };
 }
 
 export async function fetchChudState(): Promise<ChudState | null> {

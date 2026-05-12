@@ -409,6 +409,35 @@ a:hover {
   margin: -4px 0 10px 0;
 }
 
+.trade-feed-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px 0;
+}
+.trade-feed-tab {
+  font-family: inherit;
+  font-size: 0.82rem;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+.trade-feed-tab:hover {
+  border-color: var(--chud-accent);
+}
+.trade-feed-tab.active {
+  border-color: var(--chud-accent);
+  background: color-mix(in srgb, var(--chud-accent) 12%, var(--surface));
+  font-weight: 600;
+}
+.trade-feed-hint {
+  margin: 0 0 12px 0;
+  font-size: 0.85rem;
+  color: var(--muted-on-surface);
+}
 .trade-feed-empty {
   color: var(--muted);
   font-size: 0.9rem;
@@ -886,10 +915,22 @@ a:hover {
 .balance-chart-panel {
   margin-bottom: 0;
 }
+.balance-chart-range {
+  margin: 0 0 8px 0;
+  font-size: 0.78rem;
+  color: var(--muted-on-surface);
+  line-height: 1.4;
+}
 .balance-chart {
   position: relative;
   width: 100%;
   padding: 16px 0 0;
+}
+.balance-chart-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 280px;
 }
 .balance-chart svg {
   display: block;

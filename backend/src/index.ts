@@ -55,7 +55,7 @@ app.get("/api/trades", (_req, res) => {
 });
 
 app.get("/api/trades/latest", (req, res) => {
-  const limit = Math.min(Number(req.query.limit) || 10, 50);
+  const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 2000);
   const trades = realTradesOnly(getTrades()).slice(0, limit);
   res.json({ trades });
 });
@@ -106,7 +106,22 @@ app.get("/api/balance/chart", async (_req, res) => {
   }
 
   points.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-  res.json({ points });
+
+  const rawCount = points.length;
+  const maxPts = Math.min(12_000, Math.max(400, Number(process.env.CHUD_CHART_MAX_POINTS) || 8000));
+  if (points.length > maxPts) {
+    const thin: typeof points = [];
+    const n = points.length;
+    const step = (n - 1) / (maxPts - 1);
+    for (let i = 0; i < maxPts; i++) {
+      thin.push(points[Math.round(i * step)]!);
+    }
+    points = thin;
+  }
+
+  const from = points[0]?.timestamp;
+  const to = points[points.length - 1]?.timestamp;
+  res.json({ points, meta: { from, to, count: points.length, rawCount } });
 });
 
 app.get("/api/chud/state", (_req, res) => {
