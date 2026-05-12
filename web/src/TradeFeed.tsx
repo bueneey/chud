@@ -46,7 +46,7 @@ export function TradeFeed({ trades }: Props) {
   if (events.length === 0) {
     return (
       <div className="panel">
-        <div className="panel-title">[ trade feed — live ]</div>
+        <div className="panel-title">[ trade feed - live ]</div>
         <div className="trade-feed">
           <p className="trade-feed-empty">no trades yet. when chud buys, a buy row will appear; when he sells, a sell row will appear.</p>
         </div>
@@ -56,7 +56,7 @@ export function TradeFeed({ trades }: Props) {
 
   return (
     <div className="panel">
-      <div className="panel-title">[ trade feed — live ]</div>
+      <div className="panel-title">[ trade feed - live ]</div>
       <div className="trade-feed trade-feed-rows">
         {events.map((ev, i) => (
           <div key={ev.type + ev.trade.id + ev.timestamp + i} className={`trade-feed-row trade-feed-row-${ev.type}`}>

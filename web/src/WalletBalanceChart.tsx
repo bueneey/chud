@@ -43,7 +43,8 @@ export function WalletBalanceChart({ points, width = 800, height = 240 }: Props)
   if (points.length < 2) {
     return (
       <div className="balance-chart-empty">
-        need at least 2 completed trades to show wallet balance chart.
+        need at least 2 points on the chart (closed trades and/or saved wallet snapshots). leave the site open a minute so the
+        backend can record balance, or close a couple trades.
       </div>
     );
   }

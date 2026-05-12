@@ -1,6 +1,7 @@
 import { readFileSync, existsSync } from "fs";
-import { join, dirname, isAbsolute } from "path";
+import { join, dirname } from "path";
 import { fileURLToPath } from "url";
+import { getDataDir } from "clawdbot/config";
 
 function findRoot(): string {
   const d = dirname(fileURLToPath(import.meta.url));
@@ -14,9 +15,6 @@ function findRoot(): string {
   return root;
 }
 const root = findRoot();
-const dataDir = process.env.DATA_DIR
-  ? (isAbsolute(process.env.DATA_DIR) ? process.env.DATA_DIR : join(process.cwd(), process.env.DATA_DIR))
-  : join(root, "data");
 const TRADES_FILE = "trades.json";
 const STATE_FILE = "state.json";
 const LOGS_FILE = "logs.json";
@@ -35,7 +33,7 @@ export interface FiltersConfig {
 }
 
 function readJson<T>(filename: string, fallback: T): T {
-  const p = join(dataDir, filename);
+  const p = join(getDataDir(), filename);
   if (!existsSync(p)) return fallback;
   try {
     return JSON.parse(readFileSync(p, "utf-8")) as T;

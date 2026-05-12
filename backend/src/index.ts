@@ -13,6 +13,7 @@ import { getPublicKeyBase58 } from "clawdbot/wallet";
 import { readChudOutbox, writeChudOutbox } from "./clawdbot-outbox.js";
 import { sanitizeAgentBuyBody } from "./clawdbot-sanitize-buy.js";
 import { getTrades, getState, getFilters, getLogs } from "./data.js";
+import { maybeAppendBalanceSnapshot, readBalanceSnapshots, mergeBalanceChartPoints } from "./balance-snapshots.js";
 
 const app = express();
 app.use(cors());
@@ -61,6 +62,7 @@ app.get("/api/trades/latest", (req, res) => {
 
 app.get("/api/balance", async (_req, res) => {
   const balance = await getBalance();
+  maybeAppendBalanceSnapshot(balance);
   res.json({ balanceSol: balance });
 });
 
@@ -70,34 +72,40 @@ app.get("/api/pnl", (_req, res) => {
   res.json({ totalPnlSol, tradeCount: trades.length });
 });
 
-/** Wallet balance over time for chart: [{timestamp, balanceSol}, ...] */
+/** Wallet balance over time: closed trades + persisted RPC snapshots (same DATA_DIR as bot). */
 app.get("/api/balance/chart", async (_req, res) => {
   const trades = realTradesOnly(getTrades())
     .filter((t) => t.sellTimestamp && t.sellTimestamp.length > 0)
     .sort((a, b) => new Date(a.sellTimestamp!).getTime() - new Date(b.sellTimestamp!).getTime());
-  const points: { timestamp: string; balanceSol: number }[] = [];
+  const tradePoints: { timestamp: string; balanceSol: number }[] = [];
   const startBalance = chartStartBalanceSol();
   let balance = startBalance;
   if (trades.length > 0) {
-    points.push({
+    tradePoints.push({
       timestamp: trades[0]!.buyTimestamp,
       balanceSol: startBalance,
     });
   }
   for (const t of trades) {
     balance += t.pnlSol;
-    points.push({ timestamp: t.sellTimestamp!, balanceSol: balance });
+    tradePoints.push({ timestamp: t.sellTimestamp!, balanceSol: balance });
   }
-  // When real wallet linked, add current balance so chart ends at actual balance
+
+  const snapshots = readBalanceSnapshots();
+  let points = mergeBalanceChartPoints(tradePoints, snapshots);
+
   try {
     const { getWalletBalanceSol } = await import("clawdbot/agent");
     const real = await getWalletBalanceSol();
     if (real != null) {
+      maybeAppendBalanceSnapshot(real);
       points.push({ timestamp: new Date().toISOString(), balanceSol: real });
     }
   } catch {
     /* no wallet linked */
   }
+
+  points.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   res.json({ points });
 });
 
@@ -438,4 +446,18 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(
     `[Backend] Swaps: SOLANA_RPC_URL=${rpc ? "set" : "MISSING"} WALLET_PRIVATE_KEY=${wallet ? "set" : "MISSING"} PUMPPORTAL key in env=${pumpKey ? "yes" : "no"} append-to-trade-local=${pumpOnLocal ? "yes" : "no (default)"}`
   );
+
+  import("clawdbot/config")
+    .then(({ getDataDir }) => {
+      console.log(`[Backend] DATA_DIR (clawdbot getDataDir): ${getDataDir()}`);
+    })
+    .catch(() => {});
+
+  const snapshotTick = () => {
+    getBalance()
+      .then((b) => maybeAppendBalanceSnapshot(b))
+      .catch(() => {});
+  };
+  setTimeout(snapshotTick, 4000);
+  setInterval(snapshotTick, 120_000);
 });

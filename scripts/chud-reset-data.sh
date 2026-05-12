@@ -18,7 +18,8 @@ for f in trades.json state.json logs.json chud-outbox.json coach-messages.json c
   rm -f "$DATA/$f"
 done
 rm -f "$DATA"/chud-chat-*.json
+rm -f "$DATA"/balance-snapshots.json
 rm -f "$DATA/.cycle-lock"
 echo "Chud data reset: $DATA"
-echo "  removed: trades, state, logs, outbox, coach, chat (legacy + per-tab), .cycle-lock"
+echo "  removed: trades, state, logs, outbox, coach, chat (legacy + per-tab), balance snapshots, .cycle-lock"
 echo "Next: stop any server on :4000, then: npm run dev"

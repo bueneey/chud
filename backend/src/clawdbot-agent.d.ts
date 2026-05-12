@@ -37,6 +37,10 @@ declare module "clawdbot/agent" {
   export function getWalletBalanceWithError(): Promise<{ balance: number | null; error?: string }>;
 }
 
+declare module "clawdbot/config" {
+  export function getDataDir(): string;
+}
+
 declare module "clawdbot" {
   export function startTradingLoop(): Promise<never>;
 }

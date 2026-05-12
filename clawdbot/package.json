@@ -33,6 +33,11 @@
       "types": "./dist/wallet.d.ts",
       "import": "./dist/wallet.js",
       "default": "./dist/wallet.js"
+    },
+    "./config": {
+      "types": "./dist/config.d.ts",
+      "import": "./dist/config.js",
+      "default": "./dist/config.js"
     }
   },
   "scripts": {
