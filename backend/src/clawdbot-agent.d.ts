@@ -37,6 +37,10 @@ declare module "clawdbot/agent" {
   export function getWalletBalanceWithError(): Promise<{ balance: number | null; error?: string }>;
   /** Oldest on-chain signature for the wallet (paginated); null if none / unavailable. */
   export function getWalletFirstOnChainActivityMs(): Promise<number | null>;
+  /** Reconstruct SOL balance after each tx (Helius gTFA when URL is Helius); cached on disk. */
+  export function getWalletBalanceHistoryPointsCached(): Promise<
+    Array<{ timestamp: string; balanceSol: number }>
+  >;
 }
 
 declare module "clawdbot/config" {

@@ -214,8 +214,9 @@ export default function App() {
       <section className="balance-chart-section" aria-label="wallet balance over time">
         <h2 className="section-label">wallet balance chart</h2>
         <p className="section-desc">
-          all-time balance from on-chain wallet birth, closed trades, and saved RPC balance samples (so top-ups and blow-ups show,
-          not just trade pnl). poll the wallet more often if you want finer steps between refills.
+          all-time SOL from the chain when your RPC supports it (Helius: full tx history into thousands of points), merged with
+          live balance snapshots. without Helius, the server pulls a smaller slice via standard RPC. first load can take a few
+          seconds while the cache fills; then it stays fast for about an hour.
         </p>
         <div className="panel balance-chart-panel">
           <div className="panel-title">[ bot wallet balance - all time ]</div>

@@ -362,4 +362,5 @@ export {
   isPumpPortalApiKeyConfigured,
   isPumpPortalKeyAppendedToTradeLocal,
 } from "./trade.js";
+export { getWalletBalanceHistoryPointsCached } from "./wallet-balance-history.js";
 export { getPublicKeyBase58 } from "./wallet.js";

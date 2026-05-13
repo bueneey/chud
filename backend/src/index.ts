@@ -121,7 +121,17 @@ app.get("/api/balance/chart", async (_req, res) => {
   }
 
   const snapshots = readBalanceSnapshots();
+
   let points = mergeBalanceChartPoints(tradePoints, snapshots);
+  try {
+    const { getWalletBalanceHistoryPointsCached } = await import("clawdbot/agent");
+    const chain = await getWalletBalanceHistoryPointsCached();
+    if (chain.length >= 3) {
+      points = mergeBalanceChartPoints(chain, snapshots);
+    }
+  } catch {
+    /* keep trade + snapshot merge */
+  }
 
   try {
     const { getWalletBalanceSol } = await import("clawdbot/agent");
@@ -156,8 +166,8 @@ app.get("/api/balance/chart", async (_req, res) => {
   points = ensureChartOrigin(points, originMs, startBalance);
 
   const rawCount = points.length;
-  /** Time buckets + min/max per bucket so zeros/refills stay visible; raise CHUD_CHART_MAX_POINTS for more detail. */
-  const maxPts = Math.min(20_000, Math.max(800, Number(process.env.CHUD_CHART_MAX_POINTS) || 8000));
+  /** Many points: chain-reconstructed balance + extrema buckets; CHUD_CHART_MAX_POINTS caps output (default 32k, max 80k). */
+  const maxPts = Math.min(80_000, Math.max(4_000, Number(process.env.CHUD_CHART_MAX_POINTS) || 32_000));
   points = downsampleChartByTime(points, maxPts);
 
   const from = points[0]?.timestamp;
