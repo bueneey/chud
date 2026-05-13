@@ -1,12 +1,6 @@
-import { config } from "dotenv";
-import { existsSync } from "fs";
-import { join, dirname } from "path";
-import { fileURLToPath } from "url";
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const root = join(__dirname, "..", "..");
-const envPath = [join(root, ".env"), join(process.cwd(), ".env"), join(process.cwd(), "..", ".env")].find((p) => existsSync(p));
-if (envPath) config({ path: envPath });
-
+import "./load-env.js";
+import { existsSync, statSync } from "fs";
+import { join } from "path";
 import express from "express";
 import cors from "cors";
 import { getPublicKeyBase58 } from "clawdbot/wallet";
@@ -14,6 +8,12 @@ import { readChudOutbox, writeChudOutbox } from "./clawdbot-outbox.js";
 import { sanitizeAgentBuyBody } from "./clawdbot-sanitize-buy.js";
 import { getTrades, getState, getFilters, getLogs } from "./data.js";
 import { maybeAppendBalanceSnapshot, readBalanceSnapshots, mergeBalanceChartPoints } from "./balance-snapshots.js";
+import {
+  parseWalletCreatedAtMs,
+  earliestDataMs,
+  ensureChartOrigin,
+  downsampleChartByTime,
+} from "./balance-chart-utils.js";
 
 const app = express();
 app.use(cors());
@@ -58,6 +58,34 @@ app.get("/api/trades/latest", (req, res) => {
   const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 2000);
   const trades = realTradesOnly(getTrades()).slice(0, limit);
   res.json({ trades });
+});
+
+/** Where trades.json is read from (same as clawdbot). Use this if the site shows zero trades. */
+app.get("/api/chud/data-info", async (_req, res) => {
+  try {
+    const { getDataDir } = await import("clawdbot/config");
+    const dir = getDataDir();
+    const tradesPath = join(dir, "trades.json");
+    const all = getTrades();
+    const real = realTradesOnly(all);
+    let tradesFileBytes = 0;
+    try {
+      if (existsSync(tradesPath)) tradesFileBytes = statSync(tradesPath).size;
+    } catch {
+      /* ignore */
+    }
+    res.json({
+      dataDir: dir,
+      tradesPath,
+      tradesFileExists: existsSync(tradesPath),
+      tradesFileBytes,
+      tradeRowsInFile: all.length,
+      tradeRowsAfterDemoFilter: real.length,
+      sampleSymbols: real.slice(0, 10).map((t) => t.symbol),
+    });
+  } catch (e) {
+    res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
+  }
 });
 
 app.get("/api/balance", async (_req, res) => {
@@ -107,17 +135,18 @@ app.get("/api/balance/chart", async (_req, res) => {
 
   points.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
+  const originMs =
+    parseWalletCreatedAtMs() ??
+    earliestDataMs(
+      trades.map((t) => ({ buyTimestamp: t.buyTimestamp })),
+      snapshots
+    );
+  points = ensureChartOrigin(points, originMs, startBalance);
+
   const rawCount = points.length;
-  const maxPts = Math.min(12_000, Math.max(400, Number(process.env.CHUD_CHART_MAX_POINTS) || 8000));
-  if (points.length > maxPts) {
-    const thin: typeof points = [];
-    const n = points.length;
-    const step = (n - 1) / (maxPts - 1);
-    for (let i = 0; i < maxPts; i++) {
-      thin.push(points[Math.round(i * step)]!);
-    }
-    points = thin;
-  }
+  /** Time-uniform downsample: fewer points = longer-span / less noisy overview. */
+  const maxPts = Math.min(2000, Math.max(96, Number(process.env.CHUD_CHART_MAX_POINTS) || 240));
+  points = downsampleChartByTime(points, maxPts);
 
   const from = points[0]?.timestamp;
   const to = points[points.length - 1]?.timestamp;

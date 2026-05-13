@@ -39,6 +39,7 @@ declare module "clawdbot/agent" {
 
 declare module "clawdbot/config" {
   export function getDataDir(): string;
+  export function getConfigDir(): string;
 }
 
 declare module "clawdbot" {

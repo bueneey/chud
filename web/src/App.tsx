@@ -31,7 +31,7 @@ const POLL_MS = 3000;
 type PageView = "home" | "feed" | "logs";
 
 export default function App() {
-  const blownPortCount = 1; // manual counter: bump when the chud nukes another port
+  const blownPortCount: number = 4; // manual counter: bump when the chud nukes another port
   const [chatTabSessionId] = useState(() => getOrCreateChudChatTabSessionId());
   const [trades, setTrades] = useState<TradeRecord[]>([]);
   const [balance, setBalance] = useState<number>(0);
@@ -217,7 +217,9 @@ export default function App() {
       <section className="balance-chart-section" aria-label="wallet balance over time">
         <h2 className="section-label">wallet balance chart</h2>
         <p className="section-desc">
-          full timeline: every closed trade step plus saved on-chain balance samples (same data folder as the bot). polls every few seconds.
+          all-time balance (from your configured wallet start / earliest trades and snapshots). the line is time-based and lightly
+          downsampled so long spans stay readable. set <code>CHUD_WALLET_CREATED_AT</code> in the backend
+          env to pin the left edge to the real wallet birthday.
         </p>
         <div className="panel balance-chart-panel">
           <div className="panel-title">[ bot wallet balance - all time ]</div>

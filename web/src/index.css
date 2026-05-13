@@ -631,6 +631,14 @@ a:hover {
   line-height: 1.5;
 }
 
+.section-desc code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.88em;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(107, 143, 98, 0.12);
+}
+
 .about-section { margin-bottom: 24px; }
 .about-panel p { margin: 0 0 12px 0; line-height: 1.6; }
 .about-panel p:last-child { margin-bottom: 0; }

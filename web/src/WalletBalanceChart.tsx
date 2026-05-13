@@ -18,12 +18,29 @@ function formatTimestamp(iso: string): string {
   });
 }
 
+function formatChartTick(iso: string, spanMs: number): string {
+  const d = new Date(iso);
+  const dayMs = 86_400_000;
+  if (spanMs > 14 * dayMs) {
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  }
+  if (spanMs > 2 * dayMs) {
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  }
+  return d.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function formatRangeLine(meta: BalanceChartMeta | null | undefined): string | null {
   if (!meta?.from || !meta?.to) return null;
   const same = meta.from === meta.to;
-  const span = same
-    ? formatTimestamp(meta.from)
-    : `${formatTimestamp(meta.from)} → ${formatTimestamp(meta.to)}`;
+  const spanMs = Math.abs(Date.parse(meta.to) - Date.parse(meta.from));
+  const fmt = (iso: string) => formatChartTick(iso, spanMs);
+  const span = same ? fmt(meta.from) : `${fmt(meta.from)} → ${fmt(meta.to)}`;
   const detail =
     meta.rawCount != null && meta.count != null && meta.rawCount > meta.count
       ? ` (${meta.count} points shown, ${meta.rawCount} before downsample)`
@@ -37,20 +54,42 @@ export function WalletBalanceChart({ points, meta, width = 800, height = 240 }: 
   const [hover, setHover] = useState<{ point: BalanceChartPoint; index: number } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
+  const padding = { top: 16, right: 24, bottom: 44, left: 96 };
+  const chartW = width - padding.left - padding.right;
+  const chartH = height - padding.top - padding.bottom;
+
+  const { times, tMin, span } = useMemo(() => {
+    const t = points.map((p) => Date.parse(p.timestamp));
+    const tMinV = Math.min(...t);
+    const tMaxV = Math.max(...t);
+    return { times: t, tMin: tMinV, span: Math.max(tMaxV - tMinV, 1) };
+  }, [points]);
+
+  const xFromTime = useCallback(
+    (iso: string) => padding.left + ((Date.parse(iso) - tMin) / span) * chartW,
+    [tMin, span, chartW, padding.left]
+  );
+
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<SVGSVGElement>) => {
       if (!svgRef.current || points.length < 2) return;
       const rect = svgRef.current.getBoundingClientRect();
       const xSvg = ((e.clientX - rect.left) / rect.width) * width;
-      const padding = { left: 96, right: 24, top: 16, bottom: 44 };
-      const chartW = width - padding.left - padding.right;
       const relX = (xSvg - padding.left) / chartW;
-      const idx = Math.round(relX * (points.length - 1));
-      const i = Math.max(0, Math.min(idx, points.length - 1));
-      const p = points[i]!;
-      setHover({ point: p, index: i });
+      const clamped = Math.max(0, Math.min(1, relX));
+      const targetT = tMin + clamped * span;
+      let bestI = 0;
+      let bestD = Infinity;
+      for (let i = 0; i < points.length; i++) {
+        const d = Math.abs(times[i]! - targetT);
+        if (d < bestD) {
+          bestD = d;
+          bestI = i;
+        }
+      }
+      setHover({ point: points[bestI]!, index: bestI });
     },
-    [points, width]
+    [points, times, width, tMin, span, chartW, padding.left]
   );
 
   const handleMouseLeave = useCallback(() => setHover(null), []);
@@ -61,10 +100,20 @@ export function WalletBalanceChart({ points, meta, width = 800, height = 240 }: 
     const want = Math.min(8, n);
     const tickSet = new Set([0, n - 1]);
     for (let k = 1; k < want - 1; k++) {
-      tickSet.add(Math.round((k / (want - 1)) * (n - 1)));
+      const targetT = tMin + (span * k) / (want - 1);
+      let bestI = 0;
+      let bestD = Infinity;
+      for (let i = 0; i < n; i++) {
+        const d = Math.abs(times[i]! - targetT);
+        if (d < bestD) {
+          bestD = d;
+          bestI = i;
+        }
+      }
+      tickSet.add(bestI);
     }
     return Array.from(tickSet).sort((a, b) => a - b);
-  }, [points]);
+  }, [points.length, times, tMin, span]);
 
   if (points.length < 2) {
     return (
@@ -78,21 +127,19 @@ export function WalletBalanceChart({ points, meta, width = 800, height = 240 }: 
   const balances = points.map((p) => p.balanceSol);
   const minBal = Math.min(...balances);
   const maxBal = Math.max(...balances);
-  const range = maxBal - minBal || 0.1;
-  const padding = { top: 16, right: 24, bottom: 44, left: 96 };
-  const chartW = width - padding.left - padding.right;
-  const chartH = height - padding.top - padding.bottom;
+  const yRange = maxBal - minBal || 0.1;
+
+  const y = (v: number) => padding.top + chartH - ((v - minBal) / yRange) * chartH;
 
   const yTickCount = 8;
   const yTicks = Array.from({ length: yTickCount + 1 }, (_, i) => {
     const t = i / yTickCount;
-    return minBal + (1 - t) * range;
+    return minBal + (1 - t) * yRange;
   });
 
-  const x = (i: number) => padding.left + (i / (points.length - 1)) * chartW;
-  const y = (v: number) => padding.top + chartH - ((v - minBal) / range) * chartH;
-
-  const pathD = points.map((p, i) => `${i === 0 ? "M" : "L"} ${x(i)} ${y(p.balanceSol)}`).join(" ");
+  const pathD = points.map((p, i) => `${i === 0 ? "M" : "L"} ${xFromTime(p.timestamp)} ${y(p.balanceSol)}`).join(" ");
+  const xEnd = xFromTime(points[points.length - 1]!.timestamp);
+  const xStart = xFromTime(points[0]!.timestamp);
 
   const rangeLine = formatRangeLine(meta);
 
@@ -128,12 +175,13 @@ export function WalletBalanceChart({ points, meta, width = 800, height = 240 }: 
         {xTickIndices.map((idx) => {
           const p = points[idx];
           if (!p) return null;
+          const xt = xFromTime(p.timestamp);
           return (
             <g key={idx}>
               <line
-                x1={x(idx)}
+                x1={xt}
                 y1={padding.top}
-                x2={x(idx)}
+                x2={xt}
                 y2={padding.top + chartH}
                 stroke="var(--border)"
                 strokeWidth={1}
@@ -141,18 +189,18 @@ export function WalletBalanceChart({ points, meta, width = 800, height = 240 }: 
                 opacity={0.4}
               />
               <text
-                x={x(idx)}
+                x={xt}
                 y={padding.top + chartH + 20}
                 textAnchor="middle"
                 className="balance-chart-label balance-chart-x-label"
               >
-                {formatTimestamp(p.timestamp)}
+                {formatChartTick(p.timestamp, span)}
               </text>
             </g>
           );
         })}
         <path
-          d={`${pathD} L ${x(points.length - 1)} ${y(minBal)} L ${x(0)} ${y(minBal)} Z`}
+          d={`${pathD} L ${xEnd} ${y(minBal)} L ${xStart} ${y(minBal)} Z`}
           fill="var(--chud-accent)"
           fillOpacity={0.15}
         />
@@ -167,9 +215,9 @@ export function WalletBalanceChart({ points, meta, width = 800, height = 240 }: 
         {hover && (
           <g className="balance-chart-hover">
             <line
-              x1={x(hover.index)}
+              x1={xFromTime(hover.point.timestamp)}
               y1={padding.top}
-              x2={x(hover.index)}
+              x2={xFromTime(hover.point.timestamp)}
               y2={padding.top + chartH}
               stroke="var(--chud-accent)"
               strokeWidth={1}
@@ -177,7 +225,7 @@ export function WalletBalanceChart({ points, meta, width = 800, height = 240 }: 
               opacity={0.45}
             />
             <circle
-              cx={x(hover.index)}
+              cx={xFromTime(hover.point.timestamp)}
               cy={y(hover.point.balanceSol)}
               r={2.75}
               fill="var(--chud-accent)"

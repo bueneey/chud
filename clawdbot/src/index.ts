@@ -1,13 +1,5 @@
-import { config } from "dotenv";
-import { existsSync } from "fs";
-import { join } from "path";
-const envPath = [
-  join(process.cwd(), ".env"),
-  join(process.cwd(), "..", ".env"),
-  join(process.cwd(), "..", "..", ".env"),
-].find((p) => existsSync(p));
-if (envPath) config({ path: envPath });
-import { loadFilters, getDataDir, DEMO_MODE, getChudOwnTokenMint } from "./config.js";
+import "./load-env.js";
+import { loadFilters, getDataDir, isDemoMode, getChudOwnTokenMint } from "./config.js";
 import {
   setState,
   getOpenTrade,
@@ -314,7 +306,7 @@ async function runCycleBody(): Promise<void> {
       emitIdle();
       return;
     }
-    if (curveSol == null && !DEMO_MODE) {
+    if (curveSol == null && !isDemoMode()) {
       console.warn("[Clawdbot] Could not fetch bonding curve for", chosen.symbol, ", skipping (require min 0.8 SOL fees)");
       emitIdle();
       return;
@@ -381,7 +373,7 @@ async function runCycleBody(): Promise<void> {
 export async function startTradingLoop(): Promise<never> {
   releaseCycleLock();
   console.log("[Clawdbot] Data dir:", getDataDir());
-  console.log("[Clawdbot] Demo mode:", DEMO_MODE);
+  console.log("[Clawdbot] Demo mode:", isDemoMode());
   const kp = loadKeypair();
   console.log("[Clawdbot] Wallet:", kp ? kp.publicKey.toBase58().slice(0, 8) + "…" : "NOT SET");
   console.log("[Clawdbot] Filters:", JSON.stringify(loadFilters(), null, 2));
