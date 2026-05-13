@@ -66,27 +66,44 @@ function dedupeAdjacentSameTime(points: BalanceSnapshotPoint[]): BalanceSnapshot
 }
 
 /**
- * Cap display points using **time** (not array index) so uneven samples map correctly.
+ * Time buckets: keep first/last sample in each bucket plus the points with **min** and **max** balance
+ * so wipes, refills, and spikes survive downsampling (plain averages would flatten them).
  */
 export function downsampleChartByTime(
   sortedPoints: BalanceSnapshotPoint[],
-  maxPoints: number
+  maxOut: number
 ): BalanceSnapshotPoint[] {
-  if (sortedPoints.length <= maxPoints) return sortedPoints;
+  if (sortedPoints.length <= maxOut) return sortedPoints;
   const t0 = Date.parse(sortedPoints[0]!.timestamp);
   const t1 = Date.parse(sortedPoints[sortedPoints.length - 1]!.timestamp);
   if (!Number.isFinite(t0) || !Number.isFinite(t1)) return sortedPoints;
   const span = Math.max(t1 - t0, 1);
-  const buckets = maxPoints;
+  const maxPerBucket = 4;
+  const nBuckets = Math.max(1, Math.floor(maxOut / maxPerBucket));
   const out: BalanceSnapshotPoint[] = [];
-  let j = 0;
-  for (let b = 0; b < buckets; b++) {
-    const end = b === buckets - 1 ? t1 + 1 : t0 + (span * (b + 1)) / (buckets - 1);
-    while (j < sortedPoints.length && Date.parse(sortedPoints[j]!.timestamp) <= end) {
-      j++;
+  let idx = 0;
+  for (let b = 0; b < nBuckets; b++) {
+    const bt0 = t0 + (span * b) / nBuckets;
+    const bt1 = b === nBuckets - 1 ? t1 + 1 : t0 + (span * (b + 1)) / nBuckets;
+    while (idx < sortedPoints.length && Date.parse(sortedPoints[idx]!.timestamp) < bt0) idx++;
+    const startIdx = idx;
+    let k = idx;
+    while (k < sortedPoints.length && Date.parse(sortedPoints[k]!.timestamp) < bt1) k++;
+    const bucket = sortedPoints.slice(startIdx, k);
+    idx = k;
+    if (bucket.length === 0) continue;
+    const first = bucket[0]!;
+    const last = bucket[bucket.length - 1]!;
+    let minP = first;
+    let maxP = first;
+    for (const p of bucket) {
+      if (p.balanceSol < minP.balanceSol) minP = p;
+      if (p.balanceSol > maxP.balanceSol) maxP = p;
     }
-    const idx = Math.max(0, j - 1);
-    out.push(sortedPoints[idx]!);
+    const pick = new Map<string, BalanceSnapshotPoint>();
+    for (const p of [first, last, minP, maxP]) pick.set(p.timestamp, p);
+    const chunk = Array.from(pick.values()).sort((a, c) => Date.parse(a.timestamp) - Date.parse(c.timestamp));
+    for (const p of chunk) out.push(p);
   }
   return dedupeAdjacentSameTime(out);
 }

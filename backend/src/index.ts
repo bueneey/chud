@@ -156,8 +156,8 @@ app.get("/api/balance/chart", async (_req, res) => {
   points = ensureChartOrigin(points, originMs, startBalance);
 
   const rawCount = points.length;
-  /** Time-uniform downsample: fewer points = longer-span / less noisy overview. */
-  const maxPts = Math.min(2000, Math.max(96, Number(process.env.CHUD_CHART_MAX_POINTS) || 240));
+  /** Time buckets + min/max per bucket so zeros/refills stay visible; raise CHUD_CHART_MAX_POINTS for more detail. */
+  const maxPts = Math.min(20_000, Math.max(800, Number(process.env.CHUD_CHART_MAX_POINTS) || 8000));
   points = downsampleChartByTime(points, maxPts);
 
   const from = points[0]?.timestamp;

@@ -1,9 +1,8 @@
 import { useState, useRef, useCallback, useMemo } from "react";
-import type { BalanceChartPoint, BalanceChartMeta } from "./api";
+import type { BalanceChartPoint } from "./api";
 
 interface Props {
   points: BalanceChartPoint[];
-  meta?: BalanceChartMeta | null;
   width?: number;
   height?: number;
 }
@@ -35,22 +34,7 @@ function formatChartTick(iso: string, spanMs: number): string {
   });
 }
 
-function formatRangeLine(meta: BalanceChartMeta | null | undefined): string | null {
-  if (!meta?.from || !meta?.to) return null;
-  const same = meta.from === meta.to;
-  const spanMs = Math.abs(Date.parse(meta.to) - Date.parse(meta.from));
-  const fmt = (iso: string) => formatChartTick(iso, spanMs);
-  const span = same ? fmt(meta.from) : `${fmt(meta.from)} → ${fmt(meta.to)}`;
-  const detail =
-    meta.rawCount != null && meta.count != null && meta.rawCount > meta.count
-      ? ` (${meta.count} points shown, ${meta.rawCount} before downsample)`
-      : meta.count != null
-        ? ` (${meta.count} points)`
-        : "";
-  return `range: ${span}${detail}`;
-}
-
-export function WalletBalanceChart({ points, meta, width = 800, height = 240 }: Props) {
+export function WalletBalanceChart({ points, width = 1100, height = 300 }: Props) {
   const [hover, setHover] = useState<{ point: BalanceChartPoint; index: number } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -97,7 +81,7 @@ export function WalletBalanceChart({ points, meta, width = 800, height = 240 }: 
   const xTickIndices = useMemo(() => {
     const n = points.length;
     if (n <= 1) return n === 1 ? [0] : [];
-    const want = Math.min(8, n);
+    const want = Math.min(10, n);
     const tickSet = new Set([0, n - 1]);
     for (let k = 1; k < want - 1; k++) {
       const targetT = tMin + (span * k) / (want - 1);
@@ -141,11 +125,8 @@ export function WalletBalanceChart({ points, meta, width = 800, height = 240 }: 
   const xEnd = xFromTime(points[points.length - 1]!.timestamp);
   const xStart = xFromTime(points[0]!.timestamp);
 
-  const rangeLine = formatRangeLine(meta);
-
   return (
     <div className="balance-chart">
-      {rangeLine && <p className="balance-chart-range">{rangeLine}</p>}
       <svg
         ref={svgRef}
         viewBox={`0 0 ${width} ${height}`}

@@ -923,12 +923,6 @@ a:hover {
 .balance-chart-panel {
   margin-bottom: 0;
 }
-.balance-chart-range {
-  margin: 0 0 8px 0;
-  font-size: 0.78rem;
-  color: var(--muted-on-surface);
-  line-height: 1.4;
-}
 .balance-chart {
   position: relative;
   width: 100%;
@@ -938,7 +932,7 @@ a:hover {
   display: block;
   width: 100%;
   height: auto;
-  max-height: 280px;
+  max-height: 360px;
 }
 .balance-chart svg {
   display: block;

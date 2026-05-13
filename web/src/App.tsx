@@ -11,7 +11,6 @@ import {
   type TradeRecord,
   type ChudState,
   type BalanceChartPoint,
-  type BalanceChartMeta,
   type ChudChatTurn,
   type LogEntry,
   type ChudOutboxResponse,
@@ -37,7 +36,6 @@ export default function App() {
   const [balance, setBalance] = useState<number>(0);
   const [pnl, setPnl] = useState<number>(0);
   const [balanceChartPoints, setBalanceChartPoints] = useState<BalanceChartPoint[]>([]);
-  const [balanceChartMeta, setBalanceChartMeta] = useState<BalanceChartMeta | null>(null);
   const [state, setState] = useState<ChudState | null>(null);
   const [chatMessages, setChatMessages] = useState<ChudChatTurn[]>([]);
   const [chatLlmConfigured, setChatLlmConfigured] = useState(false);
@@ -73,7 +71,6 @@ export default function App() {
         setBalance(b);
         setPnl(p.totalPnlSol);
         setBalanceChartPoints(chart.points ?? []);
-        setBalanceChartMeta(chart.meta ?? null);
         setState(s);
         setChatMessages(chat.messages);
         setChatLlmConfigured(chat.llmConfigured);
@@ -217,12 +214,12 @@ export default function App() {
       <section className="balance-chart-section" aria-label="wallet balance over time">
         <h2 className="section-label">wallet balance chart</h2>
         <p className="section-desc">
-          all-time balance: the backend walks your wallet&apos;s on-chain history (oldest signature) and prepends your start SOL
-          there, merged with trades and snapshots. the line is time-based and lightly downsampled so long spans stay readable.
+          all-time balance from on-chain wallet birth, closed trades, and saved RPC balance samples (so top-ups and blow-ups show,
+          not just trade pnl). poll the wallet more often if you want finer steps between refills.
         </p>
         <div className="panel balance-chart-panel">
           <div className="panel-title">[ bot wallet balance - all time ]</div>
-          <WalletBalanceChart points={balanceChartPoints} meta={balanceChartMeta} />
+          <WalletBalanceChart points={balanceChartPoints} />
         </div>
       </section>
       <section aria-label="blown port counter">
