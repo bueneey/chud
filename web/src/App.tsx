@@ -217,9 +217,8 @@ export default function App() {
       <section className="balance-chart-section" aria-label="wallet balance over time">
         <h2 className="section-label">wallet balance chart</h2>
         <p className="section-desc">
-          all-time balance (from your configured wallet start / earliest trades and snapshots). the line is time-based and lightly
-          downsampled so long spans stay readable. set <code>CHUD_WALLET_CREATED_AT</code> in the backend
-          env to pin the left edge to the real wallet birthday.
+          all-time balance: the backend walks your wallet&apos;s on-chain history (oldest signature) and prepends your start SOL
+          there, merged with trades and snapshots. the line is time-based and lightly downsampled so long spans stay readable.
         </p>
         <div className="panel balance-chart-panel">
           <div className="panel-title">[ bot wallet balance - all time ]</div>

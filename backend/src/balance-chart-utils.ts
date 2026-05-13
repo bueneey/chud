@@ -1,10 +1,25 @@
 import type { BalanceSnapshotPoint } from "./balance-snapshots.js";
 
-export function parseWalletCreatedAtMs(): number | null {
+/** Optional manual chart anchor (ISO). Prefer on-chain discovery via getWalletFirstOnChainActivityMs. */
+export function parseWalletChartAnchorOverrideMs(): number | null {
   const raw = process.env.CHUD_WALLET_CREATED_AT?.trim();
   if (!raw) return null;
   const n = Date.parse(raw);
   return Number.isFinite(n) ? n : null;
+}
+
+/** Earliest plausible chart start: manual override, else min(RPC wallet birth, local data). */
+export function resolveChartOriginMs(opts: {
+  manualOverrideMs: number | null;
+  chainBirthMs: number | null;
+  inferredMs: number | null;
+}): number | null {
+  if (opts.manualOverrideMs != null) return opts.manualOverrideMs;
+  const parts = [opts.chainBirthMs, opts.inferredMs].filter(
+    (x): x is number => x != null && Number.isFinite(x)
+  );
+  if (parts.length === 0) return null;
+  return Math.min(...parts);
 }
 
 /** Earliest timestamp we can infer from trades (first buy) or snapshots. */
@@ -25,10 +40,7 @@ export function earliestDataMs(
   return Math.min(...times);
 }
 
-/**
- * Prepend a point at wallet birth so the x-axis spans full lifetime when
- * CHUD_WALLET_CREATED_AT is set (or falls back to earliest trade/snapshot elsewhere).
- */
+/** Prepend a point at chart origin so the x-axis starts at wallet birth / earliest data. */
 export function ensureChartOrigin(
   sortedPoints: BalanceSnapshotPoint[],
   originMs: number | null,

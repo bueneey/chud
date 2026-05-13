@@ -35,6 +35,8 @@ declare module "clawdbot/agent" {
   export function setTradingPausedFile(paused: boolean): void;
   export function getWalletBalanceSol(): Promise<number | null>;
   export function getWalletBalanceWithError(): Promise<{ balance: number | null; error?: string }>;
+  /** Oldest on-chain signature for the wallet (paginated); null if none / unavailable. */
+  export function getWalletFirstOnChainActivityMs(): Promise<number | null>;
 }
 
 declare module "clawdbot/config" {

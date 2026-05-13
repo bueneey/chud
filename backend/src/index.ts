@@ -9,8 +9,9 @@ import { sanitizeAgentBuyBody } from "./clawdbot-sanitize-buy.js";
 import { getTrades, getState, getFilters, getLogs } from "./data.js";
 import { maybeAppendBalanceSnapshot, readBalanceSnapshots, mergeBalanceChartPoints } from "./balance-snapshots.js";
 import {
-  parseWalletCreatedAtMs,
+  parseWalletChartAnchorOverrideMs,
   earliestDataMs,
+  resolveChartOriginMs,
   ensureChartOrigin,
   downsampleChartByTime,
 } from "./balance-chart-utils.js";
@@ -135,12 +136,23 @@ app.get("/api/balance/chart", async (_req, res) => {
 
   points.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
-  const originMs =
-    parseWalletCreatedAtMs() ??
-    earliestDataMs(
-      trades.map((t) => ({ buyTimestamp: t.buyTimestamp })),
-      snapshots
-    );
+  let chainBirthMs: number | null = null;
+  try {
+    const { getWalletFirstOnChainActivityMs } = await import("clawdbot/agent");
+    chainBirthMs = await getWalletFirstOnChainActivityMs();
+  } catch {
+    /* agent / RPC unavailable */
+  }
+
+  const inferredMs = earliestDataMs(
+    trades.map((t) => ({ buyTimestamp: t.buyTimestamp })),
+    snapshots
+  );
+  const originMs = resolveChartOriginMs({
+    manualOverrideMs: parseWalletChartAnchorOverrideMs(),
+    chainBirthMs,
+    inferredMs,
+  });
   points = ensureChartOrigin(points, originMs, startBalance);
 
   const rawCount = points.length;

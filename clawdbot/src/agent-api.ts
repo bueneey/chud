@@ -19,6 +19,7 @@ import {
   executeSell,
   recordOpenBuy,
   getWalletBalanceSol,
+  getWalletFirstOnChainActivityMs,
   isPlaceholderBuyTokenAmount,
 } from "./trade.js";
 import {
@@ -357,6 +358,7 @@ export function setTradingPausedFile(paused: boolean): void {
 export {
   getWalletBalanceSol,
   getWalletBalanceWithError,
+  getWalletFirstOnChainActivityMs,
   isPumpPortalApiKeyConfigured,
   isPumpPortalKeyAppendedToTradeLocal,
 } from "./trade.js";

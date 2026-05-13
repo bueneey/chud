@@ -5,6 +5,85 @@ import { loadKeypair } from "./wallet.js";
 
 const LAMPORTS_PER_SOL = 1e9;
 
+/** Paginate signature history until the true oldest (or WALLET_BIRTH_FETCH_MAX_PAGES). */
+const WALLET_BIRTH_FETCH_MAX_PAGES = 300;
+
+let walletBirthResolved = false;
+let walletBirthMs: number | null = null;
+let walletBirthNextTryMs = 0;
+
+function resolveWalletPubkeyForHistory(): PublicKey | null {
+  const kp = loadKeypair();
+  if (kp) return kp.publicKey;
+  const pub = process.env.CHUD_WALLET_PUBLIC?.trim();
+  if (!pub) return null;
+  try {
+    return new PublicKey(pub);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * First on-chain activity for this wallet (oldest signature), via RPC pagination.
+ * Cached for the process after success; on RPC errors retries after a cooldown.
+ * Uses WALLET_PRIVATE_KEY pubkey, or CHUD_WALLET_PUBLIC if no keypair (read-only).
+ */
+export async function getWalletFirstOnChainActivityMs(): Promise<number | null> {
+  if (walletBirthResolved) return walletBirthMs;
+  const now = Date.now();
+  if (now < walletBirthNextTryMs) return null;
+
+  const rpc = process.env.SOLANA_RPC_URL?.trim();
+  const pubkey = resolveWalletPubkeyForHistory();
+  if (!rpc || !pubkey) {
+    walletBirthResolved = true;
+    walletBirthMs = null;
+    return null;
+  }
+
+  try {
+    const conn = new Connection(rpc);
+    let before: string | undefined;
+    let oldest: { signature: string; blockTime?: number | null } | null = null;
+
+    for (let page = 0; page < WALLET_BIRTH_FETCH_MAX_PAGES; page++) {
+      const batch = await conn.getSignaturesForAddress(pubkey, { before, limit: 1000 }, "confirmed");
+      if (batch.length === 0) break;
+      oldest = batch[batch.length - 1]!;
+      before = oldest.signature;
+      if (batch.length < 1000) break;
+    }
+
+    if (!oldest) {
+      walletBirthResolved = true;
+      walletBirthMs = null;
+      return null;
+    }
+
+    if (oldest.blockTime != null && Number.isFinite(oldest.blockTime)) {
+      walletBirthMs = oldest.blockTime * 1000;
+      walletBirthResolved = true;
+      return walletBirthMs;
+    }
+
+    const tx = await conn.getTransaction(oldest.signature, { maxSupportedTransactionVersion: 0 });
+    const bt = tx?.blockTime;
+    if (bt != null && Number.isFinite(bt)) {
+      walletBirthMs = bt * 1000;
+      walletBirthResolved = true;
+      return walletBirthMs;
+    }
+
+    walletBirthResolved = true;
+    walletBirthMs = null;
+    return null;
+  } catch {
+    walletBirthNextTryMs = Date.now() + 120_000;
+    return null;
+  }
+}
+
 /** Get current wallet SOL balance (for accurate PnL when wallet is linked). Returns null if no wallet/RPC. */
 export async function getWalletBalanceSol(): Promise<number | null> {
   const r = await getWalletBalanceWithError();
