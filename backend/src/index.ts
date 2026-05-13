@@ -126,11 +126,11 @@ app.get("/api/balance/chart", async (_req, res) => {
   try {
     const { getWalletBalanceHistoryPointsCached } = await import("clawdbot/agent");
     const chain = await getWalletBalanceHistoryPointsCached();
-    if (chain.length >= 3) {
-      points = mergeBalanceChartPoints(chain, snapshots);
+    if (chain.length > 0) {
+      points = mergeBalanceChartPoints(points, chain);
     }
   } catch {
-    /* keep trade + snapshot merge */
+    /* chain optional */
   }
 
   try {
