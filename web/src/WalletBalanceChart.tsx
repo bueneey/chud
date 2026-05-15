@@ -1,15 +1,17 @@
 import { useState, useRef, useCallback, useMemo } from "react";
 import type { BalanceChartPoint } from "./api";
+import { formatSolWithUsd } from "./formatSolUsd";
 
 interface Props {
   points: BalanceChartPoint[];
+  solPriceUsd?: number | null;
   width?: number;
   height?: number;
 }
 
 function formatTimestamp(iso: string): string {
   const d = new Date(iso);
-  return d.toLocaleDateString(undefined, {
+  return d.toLocaleString(undefined, {
     month: "short",
     day: "numeric",
     hour: "2-digit",
@@ -17,28 +19,51 @@ function formatTimestamp(iso: string): string {
   });
 }
 
-function formatChartTick(iso: string, spanMs: number): string {
-  const d = new Date(iso);
+function formatAxisDate(ms: number, spanMs: number): string {
+  const d = new Date(ms);
   const dayMs = 86_400_000;
   if (spanMs > 14 * dayMs) {
-    return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-  }
-  if (spanMs > 2 * dayMs) {
     return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   }
-  return d.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  if (spanMs > 3 * dayMs) {
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  }
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "numeric" });
 }
 
-export function WalletBalanceChart({ points, width = 1100, height = 300 }: Props) {
+/** Evenly spaced time labels with minimum pixel gap (no overlap). */
+function buildTimeAxisLabels(
+  tMin: number,
+  span: number,
+  chartLeft: number,
+  chartW: number,
+  maxLabels = 5,
+  minGapPx = 88
+): { x: number; text: string }[] {
+  if (span <= 0) return [];
+  const n = Math.min(maxLabels, 6);
+  const raw: { x: number; text: string }[] = [];
+  for (let k = 0; k < n; k++) {
+    const t = tMin + (span * k) / Math.max(n - 1, 1);
+    const x = chartLeft + ((t - tMin) / span) * chartW;
+    raw.push({ x, text: formatAxisDate(t, span) });
+  }
+  const out: { x: number; text: string }[] = [];
+  let lastX = -1e9;
+  for (const lab of raw) {
+    if (lab.x - lastX >= minGapPx) {
+      out.push(lab);
+      lastX = lab.x;
+    }
+  }
+  return out;
+}
+
+export function WalletBalanceChart({ points, solPriceUsd, width = 1100, height = 260 }: Props) {
   const [hover, setHover] = useState<{ point: BalanceChartPoint; index: number } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
-  const padding = { top: 16, right: 24, bottom: 44, left: 96 };
+  const padding = { top: 14, right: 16, bottom: 40, left: 80 };
   const chartW = width - padding.left - padding.right;
   const chartH = height - padding.top - padding.bottom;
 
@@ -52,6 +77,11 @@ export function WalletBalanceChart({ points, width = 1100, height = 300 }: Props
   const xFromTime = useCallback(
     (iso: string) => padding.left + ((Date.parse(iso) - tMin) / span) * chartW,
     [tMin, span, chartW, padding.left]
+  );
+
+  const xLabels = useMemo(
+    () => buildTimeAxisLabels(tMin, span, padding.left, chartW),
+    [tMin, span, padding.left, chartW]
   );
 
   const handleMouseMove = useCallback(
@@ -78,48 +108,18 @@ export function WalletBalanceChart({ points, width = 1100, height = 300 }: Props
 
   const handleMouseLeave = useCallback(() => setHover(null), []);
 
-  const xTickIndices = useMemo(() => {
-    const n = points.length;
-    if (n <= 1) return n === 1 ? [0] : [];
-    const want = Math.min(10, n);
-    const tickSet = new Set([0, n - 1]);
-    for (let k = 1; k < want - 1; k++) {
-      const targetT = tMin + (span * k) / (want - 1);
-      let bestI = 0;
-      let bestD = Infinity;
-      for (let i = 0; i < n; i++) {
-        const d = Math.abs(times[i]! - targetT);
-        if (d < bestD) {
-          bestD = d;
-          bestI = i;
-        }
-      }
-      tickSet.add(bestI);
-    }
-    return Array.from(tickSet).sort((a, b) => a - b);
-  }, [points.length, times, tMin, span]);
-
   if (points.length < 2) {
-    return (
-      <div className="balance-chart-empty">
-        need at least 2 points on the chart (closed trades and/or saved wallet snapshots). leave the site open a minute so the
-        backend can record balance, or close a couple trades.
-      </div>
-    );
+    return <div className="balance-chart-empty">wallet history loading…</div>;
   }
 
   const balances = points.map((p) => p.balanceSol);
-  const minBal = Math.min(...balances);
+  const minBal = Math.min(0, ...balances);
   const maxBal = Math.max(...balances);
   const yRange = maxBal - minBal || 0.1;
 
   const y = (v: number) => padding.top + chartH - ((v - minBal) / yRange) * chartH;
 
-  const yTickCount = 8;
-  const yTicks = Array.from({ length: yTickCount + 1 }, (_, i) => {
-    const t = i / yTickCount;
-    return minBal + (1 - t) * yRange;
-  });
+  const yTicks = [0, 0.5, 1].map((t) => minBal + (1 - t) * yRange);
 
   const pathD = points.map((p, i) => `${i === 0 ? "M" : "L"} ${xFromTime(p.timestamp)} ${y(p.balanceSol)}`).join(" ");
   const xEnd = xFromTime(points[points.length - 1]!.timestamp);
@@ -146,79 +146,63 @@ export function WalletBalanceChart({ points, width = 1100, height = 300 }: Props
               stroke="var(--border)"
               strokeWidth={1}
               strokeDasharray="2 2"
-              opacity={0.6}
+              opacity={0.4}
             />
-            <text x={padding.left - 8} y={y(val)} textAnchor="end" className="balance-chart-label" dominantBaseline="middle">
-              {val.toFixed(2)} SOL
+            <text x={padding.left - 6} y={y(val)} textAnchor="end" className="balance-chart-label" dominantBaseline="middle">
+              {val.toFixed(2)}
             </text>
           </g>
         ))}
-        {xTickIndices.map((idx) => {
-          const p = points[idx];
-          if (!p) return null;
-          const xt = xFromTime(p.timestamp);
-          return (
-            <g key={idx}>
-              <line
-                x1={xt}
-                y1={padding.top}
-                x2={xt}
-                y2={padding.top + chartH}
-                stroke="var(--border)"
-                strokeWidth={1}
-                strokeDasharray="2 2"
-                opacity={0.4}
-              />
-              <text
-                x={xt}
-                y={padding.top + chartH + 20}
-                textAnchor="middle"
-                className="balance-chart-label balance-chart-x-label"
-              >
-                {formatChartTick(p.timestamp, span)}
-              </text>
-            </g>
-          );
-        })}
+        {xLabels.map((lab, i) => (
+          <text
+            key={i}
+            x={lab.x}
+            y={padding.top + chartH + 18}
+            textAnchor="middle"
+            className="balance-chart-label balance-chart-x-label"
+          >
+            {lab.text}
+          </text>
+        ))}
         <path
           d={`${pathD} L ${xEnd} ${y(minBal)} L ${xStart} ${y(minBal)} Z`}
           fill="var(--chud-accent)"
-          fillOpacity={0.15}
+          fillOpacity={0.12}
         />
         <path
           d={pathD}
           fill="none"
           stroke="var(--chud-accent)"
-          strokeWidth={2.5}
+          strokeWidth={2}
           strokeLinecap="round"
           strokeLinejoin="round"
         />
         {hover && (
-          <g className="balance-chart-hover">
+          <g>
             <line
               x1={xFromTime(hover.point.timestamp)}
               y1={padding.top}
               x2={xFromTime(hover.point.timestamp)}
               y2={padding.top + chartH}
-              stroke="var(--chud-accent)"
+              stroke="var(--text)"
               strokeWidth={1}
-              strokeDasharray="3 3"
-              opacity={0.45}
+              strokeDasharray="4 4"
+              opacity={0.35}
             />
             <circle
               cx={xFromTime(hover.point.timestamp)}
               cy={y(hover.point.balanceSol)}
-              r={2.75}
+              r={3}
               fill="var(--chud-accent)"
-              stroke="var(--text)"
-              strokeWidth={1}
             />
           </g>
         )}
       </svg>
       {hover && (
         <div className="balance-chart-tooltip">
-          <div className="balance-chart-tooltip-balance">{hover.point.balanceSol.toFixed(4)} SOL</div>
+          <div className="balance-chart-tooltip-balance">
+            {formatSolWithUsd(hover.point.balanceSol, solPriceUsd)}
+          </div>
           <div className="balance-chart-tooltip-time">{formatTimestamp(hover.point.timestamp)}</div>
         </div>
       )}

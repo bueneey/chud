@@ -64,19 +64,54 @@ export async function getTokenStats(mint: string): Promise<{ mcapUsd: number; vo
   }
 }
 
-/**
- * SOL per 1 USD (approximate for display). As of 2025, SOL ~$76.6 USD.
- * $31.4k mcap ≈ 31400 / 76.6 ≈ 410 SOL.
- */
-const SOL_PRICE_USD = 76.6;
-const SOL_PER_USD_APPROX = 1 / SOL_PRICE_USD;
+const SOL_PRICE_USD_FALLBACK = 91;
+const PRICE_CACHE_MS = 45_000;
+let cachedSolUsd: { price: number; at: number } | null = null;
 
 export function usdToSolApprox(usd: number): number {
-  return usd * SOL_PER_USD_APPROX;
+  return usd / getSolPriceUsdSync();
 }
 
-export function getSolPriceUsd(): number {
-  return SOL_PRICE_USD;
+export function getSolPriceUsdSync(): number {
+  return cachedSolUsd?.price ?? SOL_PRICE_USD_FALLBACK;
+}
+
+async function fetchSolFromCoinGecko(): Promise<number | null> {
+  const res = await fetch(
+    "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd",
+    { headers: { accept: "application/json" } }
+  );
+  if (!res.ok) return null;
+  const data = (await res.json()) as { solana?: { usd?: number } };
+  const p = data?.solana?.usd;
+  return typeof p === "number" && p > 0 ? p : null;
+}
+
+async function fetchSolFromJupiter(): Promise<number | null> {
+  const res = await fetch("https://price.jup.ag/v6/price?ids=SOL");
+  if (!res.ok) return null;
+  const data = (await res.json()) as { data?: { SOL?: { price?: number } } };
+  const p = data?.data?.SOL?.price;
+  return typeof p === "number" && p > 0 ? p : null;
+}
+
+/** Live SOL/USD (CoinGecko, then Jupiter), cached ~45s. */
+export async function getSolPriceUsd(): Promise<number> {
+  if (cachedSolUsd && Date.now() - cachedSolUsd.at < PRICE_CACHE_MS) {
+    return cachedSolUsd.price;
+  }
+  for (const fn of [fetchSolFromCoinGecko, fetchSolFromJupiter]) {
+    try {
+      const p = await fn();
+      if (p != null) {
+        cachedSolUsd = { price: p, at: Date.now() };
+        return p;
+      }
+    } catch {
+      /* next source */
+    }
+  }
+  return cachedSolUsd?.price ?? SOL_PRICE_USD_FALLBACK;
 }
 
 /**

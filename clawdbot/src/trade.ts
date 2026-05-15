@@ -457,8 +457,11 @@ export async function executeBuy(
 export async function executeSell(
   mint: string,
   tokenAmount: number,
-  filters: Filters
+  filters: Filters,
+  opts?: { sellPercent?: number }
 ): Promise<{ solReceived: number; tx?: string }> {
+  const pct = opts?.sellPercent ?? 100;
+  const amountStr = pct >= 100 ? "100%" : pct <= 0 ? "100%" : `${Math.min(100, Math.max(1, Math.round(pct)))}%`;
   const keypair = loadKeypair();
   const rpc = process.env.SOLANA_RPC_URL;
   if (!keypair || !rpc) {
@@ -483,14 +486,14 @@ export async function executeSell(
         publicKey: keypair.publicKey.toBase58(),
         action: "sell",
         mint,
-        amount: "100%",
+        amount: amountStr,
         denominatedInSol: "false",
         slippage: filters.slippagePercent ?? 15,
         priorityFee: filters.priorityFeeSol ?? 0.0001,
         pool,
       });
       lastErr = null;
-      console.log("[Chud] PumpPortal sell using pool:", pool);
+      console.log("[Chud] PumpPortal sell using pool:", pool, "amount:", amountStr);
       break;
     } catch (e) {
       lastErr = e instanceof Error ? e : new Error(String(e));

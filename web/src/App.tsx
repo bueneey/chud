@@ -6,14 +6,13 @@ import {
   fetchBalanceChart,
   fetchChudState,
   fetchChudChat,
+  fetchSolPrice,
   fetchLogs,
-  fetchChudOutbox,
   type TradeRecord,
   type ChudState,
   type BalanceChartPoint,
   type ChudChatTurn,
   type LogEntry,
-  type ChudOutboxResponse,
 } from "./api";
 import { ChudPanel } from "./ChudPanel";
 import { ChudScene } from "./ChudScene";
@@ -24,23 +23,23 @@ import CursorDitherTrail from "./components/ui/cursor-dither-trail";
 import { CAButton } from "./components/CAButton";
 import { SocialLinks } from "./components/SocialLinks";
 import { CHUD_WALLET } from "./site-config";
-import { getOrCreateChudChatTabSessionId } from "./chudChatSession";
+import { formatSolWithUsd } from "./formatSolUsd";
 
 const POLL_MS = 3000;
 type PageView = "home" | "feed" | "logs";
 
 export default function App() {
-  const blownPortCount: number = 4; // manual counter: bump when the chud nukes another port
-  const [chatTabSessionId] = useState(() => getOrCreateChudChatTabSessionId());
+  const blownPortCount: number = 5;
+  const [chatTabSessionId] = useState(() => crypto.randomUUID());
   const [trades, setTrades] = useState<TradeRecord[]>([]);
   const [balance, setBalance] = useState<number>(0);
   const [pnl, setPnl] = useState<number>(0);
+  const [solPriceUsd, setSolPriceUsd] = useState<number>(91);
   const [balanceChartPoints, setBalanceChartPoints] = useState<BalanceChartPoint[]>([]);
   const [state, setState] = useState<ChudState | null>(null);
   const [chatMessages, setChatMessages] = useState<ChudChatTurn[]>([]);
   const [chatLlmConfigured, setChatLlmConfigured] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [outbox, setOutbox] = useState<ChudOutboxResponse>({ text: null, at: null });
   const [error, setError] = useState<string | null>(null);
   const [walletCopied, setWalletCopied] = useState(false);
   const [page, setPage] = useState<PageView>("home");
@@ -56,26 +55,46 @@ export default function App() {
   }
 
   function poll() {
-    Promise.all([
+    const tasks: Promise<unknown>[] = [
       fetchTrades(),
       fetchBalance(),
       fetchPnl(),
+      fetchSolPrice().catch(() => 91),
       fetchBalanceChart(),
       fetchChudState(),
       fetchChudChat(chatTabSessionId).catch(() => ({ messages: [] as ChudChatTurn[], llmConfigured: false })),
-      fetchLogs(200).catch(() => [] as LogEntry[]),
-      fetchChudOutbox(),
-    ])
-      .then(([t, b, p, chart, s, chat, logsData, outboxData]) => {
+    ];
+    if (page === "logs") {
+      tasks.push(fetchLogs(200).catch(() => [] as LogEntry[]));
+    }
+    Promise.all(tasks)
+      .then((results) => {
+        const t = results[0] as TradeRecord[];
+        const b = results[1] as { balanceSol: number; solPriceUsd?: number };
+        const p = results[2] as {
+          totalPnlSol: number;
+          lifetimeNetDepositSol?: number;
+          solPriceUsd?: number;
+        };
+        const solPx = results[3] as number;
+        const chart = results[4] as { points?: BalanceChartPoint[] };
+        const s = results[5] as ChudState | null;
+        const chat = results[6] as { messages: ChudChatTurn[]; llmConfigured: boolean };
+        const logsData = page === "logs" ? (results[7] as LogEntry[]) : logs;
         setTrades(t);
-        setBalance(b);
-        setPnl(p.totalPnlSol);
+        setBalance(b.balanceSol);
+        const lifetime = p.lifetimeNetDepositSol;
+        setPnl(
+          typeof lifetime === "number" && Number.isFinite(lifetime)
+            ? b.balanceSol - lifetime
+            : p.totalPnlSol
+        );
+        setSolPriceUsd(p.solPriceUsd ?? b.solPriceUsd ?? solPx ?? 91);
         setBalanceChartPoints(chart.points ?? []);
         setState(s);
         setChatMessages(chat.messages);
         setChatLlmConfigured(chat.llmConfigured);
-        setLogs(logsData);
-        setOutbox(outboxData);
+        if (page === "logs") setLogs(logsData);
         setError(null);
       })
       .catch((e) => {
@@ -89,7 +108,7 @@ export default function App() {
     poll();
     const id = setInterval(poll, POLL_MS);
     return () => clearInterval(id);
-  }, []);
+  }, [page, chatTabSessionId]);
 
   return (
     <div className="app-wrap">
@@ -176,8 +195,8 @@ export default function App() {
         <div className="stats-row">
           <div className="panel stat-box">
             <div className="panel-title">balance</div>
-            <div className="stat-value">{balance.toFixed(4)} SOL</div>
-            <p className="stat-desc">current wallet (start 1 SOL + pnl)</p>
+            <div className="stat-value">{formatSolWithUsd(balance, solPriceUsd)}</div>
+            <p className="stat-desc">live on-chain balance</p>
           </div>
           <div className="panel stat-box">
             <div className="panel-title">total pnl</div>
@@ -185,9 +204,9 @@ export default function App() {
               className="stat-value"
               style={{ color: pnl >= 0 ? "var(--green)" : "var(--red)" }}
             >
-              {pnl >= 0 ? "+" : ""}{pnl.toFixed(4)} SOL
+              {pnl >= 0 ? "+" : ""}
+              {formatSolWithUsd(pnl, solPriceUsd)}
             </div>
-            <p className="stat-desc">sum of all trade pnl</p>
           </div>
         </div>
       </section>
@@ -215,7 +234,7 @@ export default function App() {
         <h2 className="section-label">wallet balance chart</h2>
         <div className="panel balance-chart-panel">
           <div className="panel-title">[ bot wallet balance - all time ]</div>
-          <WalletBalanceChart points={balanceChartPoints} />
+          <WalletBalanceChart points={balanceChartPoints} solPriceUsd={solPriceUsd} />
         </div>
       </section>
       <section aria-label="blown port counter">
@@ -245,12 +264,10 @@ export default function App() {
         <section aria-label="chud logs">
           <h2 className="section-label">chud logs</h2>
           <div className="panel about-panel">
-            <p><strong>live chud brain feed</strong>: what openclaw + chud are thinking and doing in real time.</p>
-            <p><strong>latest thought</strong>: {outbox.text ?? "no thought posted yet."}</p>
-            {outbox.at && <p><strong>thought time</strong>: {new Date(outbox.at).toLocaleString()}</p>}
-            <p><strong>live log stream</strong>:</p>
             <div className="trade-feed trade-feed-rows">
-              {logs.map((l) => (
+              {logs
+                .filter((l) => l.type !== "skip" && !l.message.includes("Trading paused"))
+                .map((l) => (
                 <div key={l.id} className="trade-feed-row">
                   <div className="trade-feed-row-main">
                     <div className="trade-feed-row-line1">

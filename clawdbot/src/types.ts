@@ -68,6 +68,9 @@ export interface TradeRecord {
   pnlSol: number;
   txBuy?: string;
   txSell?: string;
+  /** After 50% sell at 2x, remainder still open until full exit. */
+  initialsTaken?: boolean;
+  partialSellSol?: number;
 }
 
 export type ChudStateKind = "idle" | "thinking" | "choosing" | "bought" | "sold";

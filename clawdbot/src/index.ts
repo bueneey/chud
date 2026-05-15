@@ -9,8 +9,10 @@ import {
   releaseCycleLock,
   clearStaleOpenTrades,
   updateOpenTradeToSold,
+  updateOpenTradeAfterPartialSell,
   appendLog,
 } from "./storage.js";
+import { evaluateSellRules } from "./sell-rules.js";
 import { discoverCandidates } from "./discovery.js";
 import { loadKeypair } from "./wallet.js";
 import { executeBuy, executeSell, recordOpenBuy, getWalletBalanceSol } from "./trade.js";
@@ -41,6 +43,7 @@ const HOLD_POLL_MS = Math.max(30_000, Number(process.env.CHUD_HOLD_POLL_MS || "1
 /** If >0, force a sell after this many minutes regardless of LLM. Default 0 = never (Chud only exits when the model says SELL). */
 const FORCE_SELL_AFTER_MIN = Math.max(0, Number(process.env.CHUD_FORCE_SELL_AFTER_MINUTES || "0"));
 let _loggedNoWallet = false;
+let _loggedTradingPaused = false;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
@@ -109,10 +112,42 @@ async function holdAndSell(
       }
       if (!quote) continue;
 
-      const memory = getRecentClosedTradesSummary(8);
-      const result = await askChudShouldSell(symbol, open.why ?? "", quote, memory);
-      shouldSell = result.shouldSell;
-      reason = result.reason;
+      const rule = evaluateSellRules(quote, _plan, { initialsTaken: open.initialsTaken });
+      if (rule.kind === "sell_partial") {
+        const bagTokens = open.buyTokenAmount;
+        if (bagTokens > 0) {
+          console.log("[Chud] Partial sell:", rule.reason);
+          const res = await executeSell(mint, bagTokens, filters, {
+            sellPercent: Math.round(rule.fraction * 100),
+          });
+          let solReceived = res.solReceived;
+          const balBefore = await getWalletBalanceSol();
+          if (solReceived <= 0 && balBefore != null) {
+            await sleep(3000);
+            const balAfter = await getWalletBalanceSol();
+            if (balAfter != null) solReceived = Math.max(0, balAfter - balBefore);
+          }
+          updateOpenTradeAfterPartialSell(solReceived, bagTokens * rule.fraction, res.tx);
+          appendLog({
+            type: "sell",
+            symbol,
+            message: `PARTIAL: ${rule.reason}`,
+            reason: rule.reason,
+            pnlPercent: quote.unrealizedPnlPercent ?? undefined,
+          });
+          continue;
+        }
+      }
+
+      if (rule.kind === "sell_all") {
+        shouldSell = true;
+        reason = rule.reason;
+      } else {
+        const memory = getRecentClosedTradesSummary(8);
+        const result = await askChudShouldSell(symbol, open.why ?? "", quote, memory);
+        shouldSell = result.shouldSell;
+        reason = result.reason;
+      }
       const pnlPct = quote?.unrealizedPnlPercent ?? 0;
       const holdMin = Math.floor(holdSeconds / 60);
       if (shouldSell) {
@@ -124,8 +159,9 @@ async function holdAndSell(
     if (!shouldSell) continue;
 
     console.log("[Chud] Selling:", reason ?? "LLM decided");
+    const bagTokens = getOpenTrade()?.buyTokenAmount ?? tokenAmount;
     const balBefore = await getWalletBalanceSol();
-    const res = await executeSell(mint, tokenAmount, filters);
+    const res = await executeSell(mint, bagTokens, filters);
     let solReceived = res.solReceived;
     const sellTimestamp = new Date().toISOString();
     if (solReceived <= 0 && balBefore != null) {
@@ -141,7 +177,7 @@ async function holdAndSell(
     }
     if (solReceived <= 0) solReceived = buySol * 0.95;
     const whySold = reason ?? "Chud exit";
-    updateOpenTradeToSold(solReceived, tokenAmount, sellTimestamp, res.tx, mcapAtSellUsd ?? undefined, whySold, volumeAtSellUsd);
+    updateOpenTradeToSold(solReceived, bagTokens, sellTimestamp, res.tx, mcapAtSellUsd ?? undefined, whySold, volumeAtSellUsd);
     emitSold(mint, symbol, solReceived - buySol, res.tx);
     postChudTweetSell(symbol, solReceived - buySol, whySold);
     return;
@@ -208,11 +244,10 @@ async function runCycleBody(): Promise<void> {
   }
 
   if (isTradingPaused()) {
-    appendLog({
-      type: "skip",
-      message:
-        "Trading paused—no scan or new buys (CHUD_TRADING_PAUSED=1 or POST /api/agent/trading-paused). Sells still work.",
-    });
+    if (!_loggedTradingPaused) {
+      _loggedTradingPaused = true;
+      console.log("[Clawdbot] Trading paused — no new buys (CHUD_TRADING_PAUSED or trading-paused.json). Sells still work.");
+    }
     emitIdle();
     const pollMs = Math.max(5000, Number(process.env.CHUD_TRADING_PAUSE_POLL_MS || "25000"));
     await sleep(pollMs);
@@ -222,6 +257,7 @@ async function runCycleBody(): Promise<void> {
   emitIdle();
   await sleep(2000);
 
+  _loggedTradingPaused = false;
   emitThinking();
   appendLog({ type: "thinking", message: "Scanning pump.fun for candidates..." });
   await sleep(3000);
@@ -236,7 +272,7 @@ async function runCycleBody(): Promise<void> {
     poolSize: 12,
   });
   if (candidates.length === 0) {
-    appendLog({ type: "skip", message: "No candidates found (filters: ≤1h old, mcap $10k–$31.4k, min vol $12k). Retrying next cycle." });
+    appendLog({ type: "skip", message: "Nothing worth aping this scan. Retrying next cycle." });
     emitIdle();
     return;
   }
@@ -266,7 +302,7 @@ async function runCycleBody(): Promise<void> {
       appendLog({
         type: "chosen",
         symbol: chosen.symbol,
-        message: `Chose $${chosen.symbol} — ${chosen.reason} (LLM pick failed, random)`,
+        message: `Chose $${chosen.symbol} — vibes pick (LLM failed)`,
       });
     }
   } else {
@@ -274,7 +310,7 @@ async function runCycleBody(): Promise<void> {
     appendLog({
       type: "chosen",
       symbol: chosen.symbol,
-      message: `Chose $${chosen.symbol} — ${chosen.reason} (no LLM keys—random)`,
+      message: `Chose $${chosen.symbol} — vibes pick (no LLM)`,
     });
   }
   if (chosen.mint.startsWith("DemoMint") || (ownTokenMint && chosen.mint === ownTokenMint)) {

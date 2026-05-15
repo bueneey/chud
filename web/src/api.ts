@@ -84,16 +84,63 @@ export async function fetchLatestTrades(limit = 10): Promise<TradeRecord[]> {
   return data.trades ?? [];
 }
 
-export async function fetchBalance(): Promise<number> {
+export async function fetchBalance(): Promise<{ balanceSol: number; solPriceUsd?: number }> {
   const res = await apiFetch("/balance");
   const data = await res.json();
-  return data.balanceSol ?? 0;
+  return { balanceSol: data.balanceSol ?? 0, solPriceUsd: data.solPriceUsd };
 }
 
-export async function fetchPnl(): Promise<{ totalPnlSol: number; tradeCount: number }> {
+export async function fetchPnl(): Promise<{
+  totalPnlSol: number;
+  lifetimeNetDepositSol?: number;
+  balanceSol?: number;
+  tradeCount: number;
+  solPriceUsd?: number;
+}> {
   const res = await apiFetch("/pnl");
   const data = await res.json();
-  return { totalPnlSol: data.totalPnlSol ?? 0, tradeCount: data.tradeCount ?? 0 };
+  const balanceSol = data.balanceSol as number | undefined;
+  const lifetime = data.lifetimeNetDepositSol as number | undefined;
+  const totalPnlSol =
+    typeof balanceSol === "number" &&
+    typeof lifetime === "number" &&
+    Number.isFinite(balanceSol) &&
+    Number.isFinite(lifetime)
+      ? balanceSol - lifetime
+      : (data.totalPnlSol ?? 0);
+  return {
+    totalPnlSol,
+    lifetimeNetDepositSol: lifetime,
+    balanceSol,
+    tradeCount: data.tradeCount ?? 0,
+    solPriceUsd: data.solPriceUsd,
+  };
+}
+
+async function fetchSolPriceFromWeb(): Promise<number | null> {
+  try {
+    const res = await fetch(
+      "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd"
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as { solana?: { usd?: number } };
+    const p = data?.solana?.usd;
+    return typeof p === "number" && p > 0 ? p : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchSolPrice(): Promise<number> {
+  try {
+    const res = await apiFetch("/sol-price");
+    const data = await res.json();
+    if (typeof data.solPriceUsd === "number" && data.solPriceUsd > 0) return data.solPriceUsd;
+  } catch {
+    /* backend down */
+  }
+  const web = await fetchSolPriceFromWeb();
+  return web ?? 91;
 }
 
 export interface BalanceChartMeta {

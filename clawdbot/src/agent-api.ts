@@ -90,7 +90,7 @@ export function sanitizeAgentBuyBody(body: unknown): BuyParams | { error: string
 }
 
 function fallbackBuyReason(symbol: string): string {
-  return `uhh i bought $${symbol} because it looked funny and my brain said yes`;
+  return `aped $${symbol}. ticker looked stupid. no thesis.`;
 }
 
 export async function getCandidates(): Promise<CandidateCoin[]> {
@@ -363,4 +363,8 @@ export {
   isPumpPortalKeyAppendedToTradeLocal,
 } from "./trade.js";
 export { getWalletBalanceHistoryPointsCached } from "./wallet-balance-history.js";
+export { getWalletStats } from "./wallet-stats.js";
+export { getWalletPnlTracker } from "./wallet-pnl-tracker.js";
+export { getSolPriceUsd, getSolPriceUsdSync } from "./price.js";
+export type { WalletStats } from "./wallet-stats.js";
 export { getPublicKeyBase58 } from "./wallet.js";

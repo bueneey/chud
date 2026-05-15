@@ -9,11 +9,9 @@ import { sanitizeAgentBuyBody } from "./clawdbot-sanitize-buy.js";
 import { getTrades, getState, getFilters, getLogs } from "./data.js";
 import { maybeAppendBalanceSnapshot, readBalanceSnapshots, mergeBalanceChartPoints } from "./balance-snapshots.js";
 import {
-  parseWalletChartAnchorOverrideMs,
-  earliestDataMs,
-  resolveChartOriginMs,
-  ensureChartOrigin,
-  downsampleChartByTime,
+  uniformTimeSample,
+  dedupeSameSecondKeepLast,
+  collapseNearZeroRuns,
 } from "./balance-chart-utils.js";
 
 const app = express();
@@ -33,13 +31,24 @@ function chartStartBalanceSol(): number {
   return 1;
 }
 
+async function getWalletStatsSafe() {
+  try {
+    const { getWalletStats } = await import("clawdbot/agent");
+    return await getWalletStats();
+  } catch {
+    return null;
+  }
+}
+
 async function getBalance(): Promise<number> {
+  const stats = await getWalletStatsSafe();
+  if (stats) return stats.balanceSol;
   try {
     const { getWalletBalanceSol } = await import("clawdbot/agent");
     const real = await getWalletBalanceSol();
     if (real != null) return real;
   } catch {
-    /* fallback to trades-based */
+    /* fallback */
   }
   const trades = realTradesOnly(getTrades()).filter((t) => t.sellTimestamp);
   const totalPnl = trades.reduce((s, t) => s + t.pnlSol, 0);
@@ -92,90 +101,118 @@ app.get("/api/chud/data-info", async (_req, res) => {
 app.get("/api/balance", async (_req, res) => {
   const balance = await getBalance();
   maybeAppendBalanceSnapshot(balance);
-  res.json({ balanceSol: balance });
+  let solPriceUsd: number | undefined;
+  try {
+    const { getSolPriceUsd } = await import("clawdbot/agent");
+    solPriceUsd = await getSolPriceUsd();
+  } catch {
+    /* ignore */
+  }
+  res.json({ balanceSol: balance, solPriceUsd });
 });
 
-app.get("/api/pnl", (_req, res) => {
-  const trades = realTradesOnly(getTrades()).filter((t) => t.sellTimestamp);
-  const totalPnlSol = trades.reduce((s, t) => s + t.pnlSol, 0);
-  res.json({ totalPnlSol, tradeCount: trades.length });
+app.get("/api/sol-price", async (_req, res) => {
+  try {
+    const { getSolPriceUsd } = await import("clawdbot/agent");
+    const usd = await getSolPriceUsd();
+    res.json({ solPriceUsd: usd });
+  } catch {
+    res.json({ solPriceUsd: 91 });
+  }
 });
 
-/** Wallet balance over time: closed trades + persisted RPC snapshots (same DATA_DIR as bot). */
-app.get("/api/balance/chart", async (_req, res) => {
-  const trades = realTradesOnly(getTrades())
-    .filter((t) => t.sellTimestamp && t.sellTimestamp.length > 0)
-    .sort((a, b) => new Date(a.sellTimestamp!).getTime() - new Date(b.sellTimestamp!).getTime());
-  const tradePoints: { timestamp: string; balanceSol: number }[] = [];
-  const startBalance = chartStartBalanceSol();
-  let balance = startBalance;
-  if (trades.length > 0) {
-    tradePoints.push({
-      timestamp: trades[0]!.buyTimestamp,
-      balanceSol: startBalance,
+app.get("/api/pnl", async (_req, res) => {
+  const stats = await getWalletStatsSafe();
+  if (stats && stats.source === "chain") {
+    let solPriceUsd: number | undefined;
+    try {
+      const { getSolPriceUsd } = await import("clawdbot/agent");
+      solPriceUsd = await getSolPriceUsd();
+    } catch {
+      /* ignore */
+    }
+    const lifetime = stats.lifetimeDepositedSol;
+    const totalPnlSol = stats.balanceSol - lifetime;
+    return res.json({
+      totalPnlSol,
+      lifetimeNetDepositSol: lifetime,
+      tradeCount: realTradesOnly(getTrades()).filter((t) => t.sellTimestamp).length,
+      balanceSol: stats.balanceSol,
+      source: "chain",
+      solPriceUsd,
     });
   }
-  for (const t of trades) {
-    balance += t.pnlSol;
-    tradePoints.push({ timestamp: t.sellTimestamp!, balanceSol: balance });
+  const trades = realTradesOnly(getTrades()).filter((t) => t.sellTimestamp);
+  const totalPnlSol = trades.reduce((s, t) => s + t.pnlSol, 0);
+  let solPriceUsd: number | undefined;
+  try {
+    const { getSolPriceUsd } = await import("clawdbot/agent");
+    solPriceUsd = await getSolPriceUsd();
+  } catch {
+    /* ignore */
+  }
+  res.json({ totalPnlSol, tradeCount: trades.length, source: "trades", solPriceUsd });
+});
+
+/** Wallet balance over time: on-chain tx history (primary) or trades + snapshots fallback. */
+app.get("/api/balance/chart", async (_req, res) => {
+  const stats = await getWalletStatsSafe();
+  let points: { timestamp: string; balanceSol: number }[] = stats?.chartPoints?.length
+    ? [...stats.chartPoints]
+    : [];
+
+  if (points.length < 2) {
+    const trades = realTradesOnly(getTrades())
+      .filter((t) => t.sellTimestamp && t.sellTimestamp.length > 0)
+      .sort((a, b) => new Date(a.sellTimestamp!).getTime() - new Date(b.sellTimestamp!).getTime());
+    const snapshots = readBalanceSnapshots();
+    const tradePoints: { timestamp: string; balanceSol: number }[] = [];
+    let balance = chartStartBalanceSol();
+    for (const t of trades) {
+      tradePoints.push({ timestamp: t.buyTimestamp, balanceSol: balance });
+      balance += t.pnlSol;
+      tradePoints.push({ timestamp: t.sellTimestamp!, balanceSol: balance });
+    }
+    points = mergeBalanceChartPoints(tradePoints, snapshots);
   }
 
-  const snapshots = readBalanceSnapshots();
-
-  let points = mergeBalanceChartPoints(tradePoints, snapshots);
   try {
-    const { getWalletBalanceHistoryPointsCached } = await import("clawdbot/agent");
-    const chain = await getWalletBalanceHistoryPointsCached();
-    if (chain.length > 0) {
-      points = mergeBalanceChartPoints(points, chain);
+    const bal = await getBalance();
+    maybeAppendBalanceSnapshot(bal);
+    const last = points[points.length - 1];
+    if (!last || Math.abs(last.balanceSol - bal) > 0.0001) {
+      points.push({ timestamp: new Date().toISOString(), balanceSol: bal });
     }
   } catch {
-    /* chain optional */
-  }
-
-  try {
-    const { getWalletBalanceSol } = await import("clawdbot/agent");
-    const real = await getWalletBalanceSol();
-    if (real != null) {
-      maybeAppendBalanceSnapshot(real);
-      points.push({ timestamp: new Date().toISOString(), balanceSol: real });
-    }
-  } catch {
-    /* no wallet linked */
+    /* ignore */
   }
 
   points.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-
-  let chainBirthMs: number | null = null;
-  try {
-    const { getWalletFirstOnChainActivityMs } = await import("clawdbot/agent");
-    chainBirthMs = await getWalletFirstOnChainActivityMs();
-  } catch {
-    /* agent / RPC unavailable */
-  }
-
-  const inferredMs = earliestDataMs(
-    trades.map((t) => ({ buyTimestamp: t.buyTimestamp })),
-    snapshots
-  );
-  const originMs = resolveChartOriginMs({
-    manualOverrideMs: parseWalletChartAnchorOverrideMs(),
-    chainBirthMs,
-    inferredMs,
-  });
-  points = ensureChartOrigin(points, originMs, startBalance);
+  points = dedupeSameSecondKeepLast(points);
+  points = collapseNearZeroRuns(points);
 
   const rawCount = points.length;
-  /** Many points: chain-reconstructed balance + extrema buckets; CHUD_CHART_MAX_POINTS caps output (default 32k, max 80k). */
-  const maxPts = Math.min(80_000, Math.max(4_000, Number(process.env.CHUD_CHART_MAX_POINTS) || 32_000));
-  points = downsampleChartByTime(points, maxPts);
+  const maxPts = Math.min(2000, Math.max(200, Number(process.env.CHUD_CHART_MAX_POINTS) || 800));
+  points = uniformTimeSample(points, maxPts);
 
   const from = points[0]?.timestamp;
   const to = points[points.length - 1]?.timestamp;
-  res.json({ points, meta: { from, to, count: points.length, rawCount } });
+  res.json({ points, meta: { from, to, count: points.length, rawCount, source: stats?.source ?? "fallback" } });
 });
 
-app.get("/api/chud/state", (_req, res) => {
+app.get("/api/chud/state", async (_req, res) => {
+  const trades = realTradesOnly(getTrades());
+  const openTrade = trades.find((t) => !t.sellTimestamp || t.sellTimestamp === "");
+  let balanceSol = 0;
+  try {
+    balanceSol = await getBalance();
+  } catch {
+    /* ignore */
+  }
+  const hasLivePosition = !!openTrade && balanceSol > 0.001;
+  if (!hasLivePosition) {
+    return res.json({ kind: "idle", at: new Date().toISOString() });
+  }
   const state = getState();
   res.json(state ?? { kind: "idle", at: new Date().toISOString() });
 });

@@ -43,7 +43,7 @@ function maxHeliusPages(): number {
 function fallbackMaxTx(): number {
   const n = Number(process.env.CHUD_FALLBACK_CHAIN_TXS);
   if (Number.isFinite(n) && n >= 0 && n <= 2000) return Math.floor(n);
-  return 200;
+  return 750;
 }
 
 function resolveWalletBase58(): string | null {
@@ -269,9 +269,17 @@ export async function getWalletBalanceHistoryPointsCached(): Promise<BalanceHist
   let points: BalanceHistoryPoint[] = [];
   try {
     if (shouldTryHeliusGtfa(url)) {
-      points = await heliusFetchAllPages(url, wallet, maxHeliusPages());
-    } else {
-      points = await standardRpcFallback(url, wallet, fallbackMaxTx());
+      try {
+        points = await heliusFetchAllPages(url, wallet, maxHeliusPages());
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (!/paid plans|upgrade|not available/i.test(msg)) throw e;
+        console.warn("[Chud] Helius gTFA unavailable, using standard RPC history:", msg.slice(0, 80));
+      }
+    }
+    if (points.length < 2) {
+      const fromStd = await standardRpcFallback(url, wallet, fallbackMaxTx());
+      if (fromStd.length > points.length) points = fromStd;
     }
   } catch {
     if (cached?.points?.length) return cached.points;

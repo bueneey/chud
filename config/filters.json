@@ -1,1 +1,18 @@
-{"minVolumeUsd":5000,"minMcapUsd":5000,"maxMcapUsd":40000,"minGlobalFeesPaidSol":0,"maxAgeMinutes":90,"minPositionSol":0.08,"maxPositionSol":0.21,"maxPositionPercent":95,"maxCandidates":3,"holdMinSeconds":0,"holdMaxSeconds":90,"loopDelayMs":0,"takeProfitPercent":8,"stopLossPercent":-8,"slippagePercent":90,"priorityFeeSol":0.002}
+{
+  "minVolumeUsd": 5000,
+  "minMcapUsd": 8000,
+  "maxMcapUsd": 40000,
+  "minGlobalFeesPaidSol": 0.8,
+  "maxAgeMinutes": 90,
+  "minPositionSol": 0.08,
+  "maxPositionSol": 0.21,
+  "maxPositionPercent": 95,
+  "maxCandidates": 3,
+  "holdMinSeconds": 0,
+  "holdMaxSeconds": 600,
+  "loopDelayMs": 0,
+  "takeProfitPercent": 100,
+  "stopLossPercent": -30,
+  "slippagePercent": 90,
+  "priorityFeeSol": 0.002
+}

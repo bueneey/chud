@@ -115,6 +115,20 @@ export function clearStaleOpenTrades(): void {
   tradesCache = closedOnly;
 }
 
+/** After partial sell: shrink bag, mark initials taken, accumulate partial SOL. */
+export function updateOpenTradeAfterPartialSell(solReceived: number, tokensSold: number, tx?: string): void {
+  const all = loadTrades();
+  const idx = all.findIndex((t) => !t.sellTimestamp || t.sellTimestamp === "");
+  if (idx === -1) return;
+  const t = all[idx]!;
+  t.initialsTaken = true;
+  t.partialSellSol = (t.partialSellSol ?? 0) + solReceived;
+  t.buyTokenAmount = Math.max(0, t.buyTokenAmount - tokensSold);
+  if (tx) t.txSell = tx;
+  writeFileSync(dataPath(TRADES_FILE), JSON.stringify(all, null, 2));
+  tradesCache = all;
+}
+
 /** Update the current open position (first trade with no sell) with sell data. Only one open at a time. */
 export function updateOpenTradeToSold(
   sellSol: number,
@@ -138,7 +152,8 @@ export function updateOpenTradeToSold(
   if (volumeAtSellUsd != null) t.volumeAtSellUsd = volumeAtSellUsd;
   t.holdSeconds = Math.round((new Date(sellTimestamp).getTime() - new Date(t.buyTimestamp).getTime()) / 1000);
   if (t.ageMinutesAtBuy != null) t.ageMinutesAtSell = t.ageMinutesAtBuy + Math.round(t.holdSeconds / 60);
-  t.pnlSol = sellSol - t.buySol;
+  const partial = t.partialSellSol ?? 0;
+  t.pnlSol = sellSol + partial - t.buySol;
   writeFileSync(dataPath(TRADES_FILE), JSON.stringify(all, null, 2));
   tradesCache = all;
 }

@@ -112,26 +112,12 @@ export function buildNarrativeWhy(
     "i call this setup: confident nonsense with a stop button.",
     "my thesis is vibes, timing, and a little bit of delusion.",
   ];
-  const closer: string[] = [];
-  if (ageMinutes != null) {
-    closer.push(
-      ageMinutes < 10
-        ? `coin is fresh (${ageMinutes}m old), so we are early or we are cooked.`
-        : `coin is ${ageMinutes}m old, so i am either right on time or late with confidence.`
-    );
-  }
-  if (holderStats) {
-    closer.push(
-      holderStats.isGoodHolders
-        ? `holder spread looks decent, so at least i am not alone in this bad idea.`
-        : `holder spread is sketchy, so i am sizing this like i enjoy sleep.`
-    );
-  }
-  if (plan.reason && plan.reason !== "default") {
-    closer.push(`risk brain says: ${plan.reason}. vibes brain said buy anyway.`);
-  }
+  const tags = [
+    ageMinutes != null && ageMinutes < 12 ? "fresh coin, might be early might be bait." : "",
+    "no plan, just vibes.",
+  ].filter(Boolean);
 
-  return [pick(openers, seed), pick(middle, seed + "m"), ...closer].join(" ").trim();
+  return [pick(openers, seed), pick(middle, seed + "m"), ...tags].join(" ").trim();
 }
 
 /**

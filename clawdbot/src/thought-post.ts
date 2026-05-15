@@ -56,11 +56,9 @@ async function tick(): Promise<void> {
       const pnl = pos.quote.unrealizedPnlPercent;
       const pnlSol = pos.quote.unrealizedPnlSol;
       const hm = Math.floor((pos.quote.holdSeconds ?? 0) / 60);
-      block = `memecoin session update — holding $${open.symbol}. thesis (short): ${why.slice(0, 350)}
-tape: unrealized ~${pnl != null ? pnl.toFixed(1) + "%" : "?"} (${pnlSol != null ? (pnlSol >= 0 ? "+" : "") + pnlSol.toFixed(4) : "?"} sol notional), ~${hm}m in bag. style: quick-flip desk unless narrative is clearly still ripping.
-last closed flips: ${pnlBits || "none yet"}`;
+      block = `holding $${open.symbol}. vibe: ${why.slice(0, 120)}. ${hm}m in bag. last exits: ${pnlBits || "none"}`;
     } else {
-      block = `memecoin session update — flat, no open bag. recent closes:\n${memory || "(none)"}\nlast 3 closed PnL: ${pnlBits || "n/a"}`;
+      block = `flat, no bag. last exits: ${pnlBits || memory.slice(0, 200) || "none"}`;
     }
     const line = await askChudThoughtTweet(block);
     if (!line) return;

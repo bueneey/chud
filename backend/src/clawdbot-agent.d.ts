@@ -41,6 +41,16 @@ declare module "clawdbot/agent" {
   export function getWalletBalanceHistoryPointsCached(): Promise<
     Array<{ timestamp: string; balanceSol: number }>
   >;
+  export interface WalletStats {
+    balanceSol: number;
+    totalPnlSol: number;
+    lifetimeDepositedSol: number;
+    chartPoints: Array<{ timestamp: string; balanceSol: number }>;
+    source: "chain" | "trades_fallback";
+  }
+  export function getWalletStats(): Promise<WalletStats>;
+  export function getSolPriceUsd(): Promise<number>;
+  export function getSolPriceUsdSync(): number;
 }
 
 declare module "clawdbot/config" {

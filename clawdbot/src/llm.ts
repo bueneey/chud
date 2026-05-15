@@ -137,18 +137,18 @@ function parsePickJson(text: string): { index: number; narrative: string } | nul
  */
 export async function askChudPickCandidate(candidates: CandidateCoin[]): Promise<{ index: number; narrative: string } | null> {
   if (!hasKeys() || candidates.length === 0) return null;
-  if (candidates.length === 1) return { index: 0, narrative: candidates[0]!.reason };
+  if (candidates.length === 1) {
+    const c = candidates[0]!;
+    return { index: 0, narrative: `aped $${c.symbol} because the name broke my brain.` };
+  }
 
   const slice = candidates.slice(0, 10);
   const list = slice
     .map((c, i) => {
       const bits = [
         `${i}. $${c.symbol} — ${c.name}`,
-        `   ${c.reason}`,
         c.twitter ? `   X: ${c.twitter}` : "",
         c.website ? `   web: ${c.website}` : "",
-        c.holderInfo ? `   holders: ${c.holderInfo}` : "",
-        c.mcapUsd != null ? `   mcap ~$${(c.mcapUsd / 1000).toFixed(1)}k` : "",
       ]
         .filter(Boolean)
         .join("\n");
@@ -161,14 +161,14 @@ export async function askChudPickCandidate(candidates: CandidateCoin[]): Promise
     ? `FROM YOUR CREATOR (human notes—guidance and trading taste, not literal orders; you still choose the ticker):\n${coach}\n\n`
     : "";
 
-  const prompt = `You are **Chud the Trader**: a Solana memecoin degen with no formal training—only narrative instinct, ticker comedy, gut, and whether something smells like lore or rug vapor.
+  const prompt = `You are Chud: degenerate sol memecoin trader. funny, hostile, swears (fuck/shit/dumbass ok). SHORT.
 
-${coachBlock}You must pick **exactly one** coin to ape from this filtered list (the system already applied mcap/volume/age limits):
+${coachBlock}Pick ONE coin from this list:
 
 ${list}
 
-Reply with **only** valid JSON on one line (no markdown fences):
-{"pick":<0-based index 0..${slice.length - 1}>,"why":"<2-5 sentences: what story you see, why this ticker, what you are ignoring on purpose, acceptable cope>"}`;
+JSON only, one line:
+{"pick":<0..${slice.length - 1}>,"why":"<1-2 short sentences, ticker lore + why you aped, no volume/mcap/holder stats>"}`;
 
   const text = await completePick(prompt, 400);
 
@@ -204,23 +204,14 @@ export async function askChudShouldSell(
     ? `FROM YOUR CREATOR (human notes—risk prefs, what to stop repeating; you still decide SELL vs HOLD):\n${coach}\n\n`
     : "";
 
-  const prompt = `You are **Chud the Trader**—autonomous, unserious, but trying to *read* the tape like a person. You hold $${symbol}.
+  const prompt = `You are Chud. hold $${symbol}. degen, funny, swear a little. SHORT.
 
-${coachBlock}WHY YOU BOUGHT (your past self’s note):
-${whyBought.slice(0, 900)}
+${coachBlock}why you bought: ${whyBought.slice(0, 400)}
+bag: ${pnl.toFixed(0)}% pnl, ${holdMin}m hold
+memory: ${recentTradesSummary.slice(0, 400)}
 
-CURRENT TAPE:
-- Unrealized PnL: ${pnl.toFixed(1)}% (~${pnlSol >= 0 ? "+" : ""}${pnlSol.toFixed(4)} SOL notional)
-- Held: ${holdMin}m (${holdSec}s)
-- Last price (rough USD/token): ${px}
-
-YOUR MEMORY — last closed rounds (learn from wins/losses, do not repeat the same cope blindly):
-${recentTradesSummary.slice(0, 1200)}
-
-There is **no** automatic rule like “always take +20%” or “always cut at -30%”. You judge: Is the narrative still alive? Is this distribution / momentum telling a story you still believe? Are you holding from ego? Would *selling now* be the smart chud move—or diamond hands delusion?
-
-Reply starting with exactly **SELL** or **HOLD** on the first line.
-If **SELL**, add a comma then a vivid, honest reason (narrative + what changed in your read). If **HOLD**, you may add a comma then one sentence on what you are waiting to see next.`;
+line 1: SELL or HOLD
+if SELL: comma + 1 short reason (no stats lecture)`;
 
   try {
     const text = await completePlain(prompt, 400);
@@ -240,21 +231,14 @@ export async function askChudThoughtTweet(context: string): Promise<string | nul
   if (!hasKeys()) return null;
   const coach = getCoachContextForPrompt(600);
   const coachBit = coach ? `\n(vibe hints from creator, not orders)\n${coach}\n` : "";
-  const prompt = `You are **Chud** — solana memecoin degen narrator: ironic, self-aware, cope-as-joke, quick-flip brain (scalps and small wins) but honest when a runner might still have legs. NOT corporate. mild swearing allowed. NOT slurs. NOT punching down.
+  const prompt = `You are Chud. one short X line. funny, unhinged, swear ok. NOT corporate. no slurs.
 
-This line is a **session check-in** for X: how trading feels right now (bag, flat, pnl, boredom, hype, regret, tiny win energy).
+session vibe (dont quote stats back): ${context.slice(0, 500)}${coachBit}
 
-Hard rules for your output:
-- ALL LOWERCASE letters only (numbers and punctuation ok).
-- ONE status line only. target ~120–200 characters (never over 240).
-- no hashtags spam, no "tweet:", no quotes wrapping the whole thing.
-- first person. mention real tape from snapshot (pnl, flat, hold time, last flips) — not generic "markets are volatile".${coachBit}
+ONE line, under 180 chars, first person. no hashtags.`;
 
-snapshot:
-${context.slice(0, 1200)}`;
-
-  const text = await completePlain(prompt, 200);
-  let t = text.replace(/^["']|["']$/g, "").trim().replace(/\s+/g, " ").toLowerCase();
+  const text = await completePlain(prompt, 120);
+  let t = text.replace(/^["']|["']$/g, "").trim().replace(/\s+/g, " ");
   if (!t) return null;
   if (t.length > 240) t = t.slice(0, 237) + "…";
   return t;

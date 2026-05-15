@@ -66,7 +66,7 @@ function collectFromPairs(
         mint,
         symbol: p.baseToken.symbol || "???",
         name: p.baseToken.name || p.baseToken.symbol || "Unknown",
-        reason: `Vol $${(vol / 1000).toFixed(1)}k · Mcap $${(mcap / 1000).toFixed(1)}k · ${ageMin}m old`,
+        reason: candidateBlurb(ageMin, onPump),
         volumeUsd: vol,
         mcapUsd: mcap,
         pairCreatedAt: created,
@@ -79,6 +79,14 @@ function collectFromPairs(
 }
 
 const DISCOVERY_POOL_SIZE = 12;
+
+/** User-facing blurb only — no vol/mcap (Chud voice, not spreadsheet). */
+function candidateBlurb(ageMin?: number, isPump?: boolean): string {
+  const parts: string[] = [];
+  if (ageMin != null && ageMin >= 0) parts.push(`${ageMin}m on chain`);
+  if (isPump) parts.push("pump lane");
+  return parts.length ? parts.join(" · ") : "on the board";
+}
 
 function shuffle<T>(arr: T[]): T[] {
   const out = [...arr];
@@ -135,7 +143,7 @@ export async function discoverCandidates(
         mint,
         symbol: t.symbol || "???",
         name: t.name || t.symbol || "Unknown",
-        reason: `Vol $${(vol / 1000).toFixed(1)}k · Mcap $${(mcap / 1000).toFixed(1)}k${isPump ? " · Pump" : ""}`,
+        reason: candidateBlurb(undefined, isPump),
         volumeUsd: vol,
         mcapUsd: mcap,
         liquidityUsd: liq,

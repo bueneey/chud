@@ -12,8 +12,9 @@ export function ChudPanel({ chatMessages, chatLlmConfigured, chatSessionId, onRe
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  /** Only scroll inside the chat box — never `scrollIntoView` (that scrolls the whole page). */
   const threadRef = useRef<HTMLDivElement>(null);
+  const stickToBottomRef = useRef(true);
+  const prevLenRef = useRef(0);
 
   function scrollThreadToBottom(): void {
     const el = threadRef.current;
@@ -21,7 +22,17 @@ export function ChudPanel({ chatMessages, chatLlmConfigured, chatSessionId, onRe
     el.scrollTop = el.scrollHeight;
   }
 
+  function onThreadScroll(): void {
+    const el = threadRef.current;
+    if (!el) return;
+    const dist = el.scrollHeight - el.scrollTop - el.clientHeight;
+    stickToBottomRef.current = dist < 80;
+  }
+
   useEffect(() => {
+    const grew = chatMessages.length > prevLenRef.current;
+    prevLenRef.current = chatMessages.length;
+    if (!grew || !stickToBottomRef.current) return;
     const id = window.setTimeout(() => scrollThreadToBottom(), 0);
     return () => window.clearTimeout(id);
   }, [chatMessages]);
@@ -32,11 +43,12 @@ export function ChudPanel({ chatMessages, chatLlmConfigured, chatSessionId, onRe
     if (!t || sending) return;
     setSending(true);
     setErr(null);
+    stickToBottomRef.current = true;
     try {
       await postChudChat(t, false, chatSessionId);
       setDraft("");
       onRefresh();
-      window.setTimeout(() => scrollThreadToBottom(), 400);
+      window.setTimeout(() => scrollThreadToBottom(), 100);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -58,7 +70,12 @@ export function ChudPanel({ chatMessages, chatLlmConfigured, chatSessionId, onRe
         <p className="chud-chat-warn">chat is currently offline. configure chud chat in backend settings and restart.</p>
       )}
       {chatMessages.length > 0 && (
-        <div className="chat-thread" ref={threadRef} aria-label="talk to chud">
+        <div
+          className="chat-thread"
+          ref={threadRef}
+          onScroll={onThreadScroll}
+          aria-label="talk to chud"
+        >
           {chatMessages.map((m) => (
             <div key={m.id} className={`chat-row ${m.role === "user" ? "chat-row-user" : "chat-row-chud"}`}>
               <span className="chat-meta">{m.role === "user" ? "you" : "chud"} · {new Date(m.at).toLocaleString()}</span>

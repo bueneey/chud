@@ -32,6 +32,10 @@ a {
   cursor: pointer !important;
 }
 
+html {
+  overflow-x: hidden;
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -40,7 +44,9 @@ body {
   font-size: 16px;
   line-height: 1.5;
   min-height: 100vh;
+  overflow-x: hidden;
 }
+
 
 h1, h2, .pixel {
   font-family: var(--pixel-font);
@@ -917,6 +923,13 @@ a:hover {
 .logs-pnl { font-weight: 600; font-size: 0.8rem; }
 .logs-pnl.positive { color: var(--green); }
 .logs-pnl.negative { color: var(--red); }
+.chud-scene-empty .screen-empty {
+  color: var(--muted);
+  font-size: 0.95rem;
+  padding: 24px 12px;
+  text-align: center;
+}
+
 .balance-chart-section { margin-bottom: 24px; }
 
 /* Wallet balance chart */
@@ -1151,6 +1164,75 @@ a:hover {
 }
 .agent-tape-hint code {
   font-size: 0.72rem;
+}
+
+/* Black fade-in + chud dance volume control */
+.site-media-root {
+  position: relative;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.site-black-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  background: #000;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 1.1s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.site-black-veil-out {
+  opacity: 0;
+}
+
+.site-content {
+  position: relative;
+}
+
+.chud-dance-widget {
+  position: fixed;
+  z-index: 10000;
+  top: 10px;
+  right: 10px;
+  width: 88px;
+  height: 88px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+  cursor: pointer;
+}
+.chud-dance-gif {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: transparent;
+  pointer-events: none;
+}
+.chud-dance-widget-paused {
+  opacity: 0.9;
+}
+.chud-dance-strike {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.chud-dance-strike::after {
+  content: "";
+  position: absolute;
+  top: 51%;
+  left: 12%;
+  width: 78%;
+  height: 4px;
+  background: var(--red);
+  border-radius: 2px;
+  opacity: 0.95;
+  transform: translateY(-50%) rotate(-38deg);
 }
 
 /* Scrollbar */

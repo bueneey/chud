@@ -8,8 +8,84 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet" />
+    <link rel="preload" href="/chuddance1.gif" as="image" />
   </head>
   <body>
+    <audio
+      id="chud-bgm"
+      src="/milkysong.mp3"
+      preload="auto"
+      autoplay
+      loop
+      playsinline
+      data-default-volume="0.42"
+    ></audio>
+    <script>
+      (function () {
+        var audio = document.getElementById("chud-bgm");
+        if (!audio) return;
+
+        var TARGET = parseFloat(audio.getAttribute("data-default-volume")) || 0.42;
+        var FADE_MS = 1100;
+        var fading = false;
+
+        function clamp(v) {
+          return Math.min(1, Math.max(0, v));
+        }
+
+        function fadeIn() {
+          if (fading) return;
+          fading = true;
+          var start = performance.now();
+          function tick() {
+            var t = Math.min(1, Math.max(0, (performance.now() - start) / FADE_MS));
+            audio.volume = clamp(t * TARGET);
+            if (t < 1) requestAnimationFrame(tick);
+            else fading = false;
+          }
+          requestAnimationFrame(tick);
+        }
+
+        function tryPlay() {
+          if (window.__CHUD_BGM_USER_MUTED) return;
+          if (!audio.paused) return;
+          audio.loop = true;
+          audio.muted = false;
+          audio.volume = 0;
+
+          function onPlaying() {
+            audio.muted = false;
+            fadeIn();
+          }
+
+          audio
+            .play()
+            .then(onPlaying)
+            .catch(function () {
+              audio.muted = true;
+              audio
+                .play()
+                .then(function () {
+                  audio.muted = false;
+                  fadeIn();
+                })
+                .catch(function () {
+                  audio.muted = false;
+                });
+            });
+        }
+
+        tryPlay();
+        audio.addEventListener("canplaythrough", tryPlay);
+        audio.addEventListener("loadeddata", tryPlay);
+        window.addEventListener("pageshow", tryPlay);
+
+        var retry = setInterval(tryPlay, 400);
+        setTimeout(function () {
+          clearInterval(retry);
+        }, 60000);
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

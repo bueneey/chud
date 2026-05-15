@@ -21,6 +21,7 @@ export function ChudScene({ state, trades, isHappy }: Props) {
   const kind = state?.kind ?? "idle";
   const message = state?.message ?? "";
   const openTrade = getOpenTrade(trades);
+  const hasLivePosition = kind === "bought" && !!openTrade;
 
   const copyMint = useCallback((mint: string) => {
     navigator.clipboard.writeText(mint).then(() => {
@@ -29,59 +30,53 @@ export function ChudScene({ state, trades, isHappy }: Props) {
     });
   }, []);
 
-  const hasPosition = kind === "bought" || !!openTrade;
   const positionMint = openTrade?.mint ?? state?.chosenMint;
-  const effectiveSymbol = state?.chosenSymbol ?? openTrade?.symbol ?? "—";
-  const effectiveMcap = state?.chosenMcapUsd ?? openTrade?.mcapUsd;
-  const effectiveReason = state?.chosenReason ?? openTrade?.why;
-  const searching = (kind === "idle" || kind === "thinking" || kind === "choosing") && !openTrade;
-  const showSelecting = (searching || kind === "sold") && !hasPosition;
+  const effectiveSymbol = openTrade?.symbol ?? state?.chosenSymbol ?? "—";
+  const effectiveMcap = openTrade?.mcapUsd ?? state?.chosenMcapUsd;
+  const effectiveReason = openTrade?.why ?? state?.chosenReason;
+
+  if (!hasLivePosition) {
+    return (
+      <div className="panel chud-scene chud-scene-empty">
+        <div className="panel-title">[ live claw ]</div>
+        <div className="chud-claw-and-sprite">
+          <div className="screens-row screens-row-single">
+            <div className="ascii-screen">
+              <div className="screen-frame">
+                <div className="screen-title">[ claw ]</div>
+                <div className="screen-content">
+                  <div className="screen-empty">no live position</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="chud-sprite-container" aria-hidden>
+            <img src="/chudpfptbg.png" alt="Chud the Trader" className="chud-sprite idle" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="panel chud-scene">
       <div className="panel-title">[ live claw ]</div>
       <div className="chud-status-bar">
-        {(searching || kind === "sold") && !openTrade && (
-          <span className="chud-status">
-            {kind === "sold" ? "position closed · selecting next coin…" : "no position · selecting next coin…"}
-          </span>
-        )}
-        {hasPosition && <span className="chud-status chud-status-position">in position: {effectiveSymbol}</span>}
+        <span className="chud-status chud-status-position">in position: {effectiveSymbol}</span>
       </div>
-
-      {(kind === "thinking" || kind === "choosing") && (
-        <div className="thought-bubble">
-          <span className="blink">...</span> {kind === "choosing" ? "selecting coin ..." : "searching for coins ..."}
-        </div>
-      )}
-
       <div className="chud-claw-and-sprite">
         <div className="screens-row screens-row-single">
-          <div className={`ascii-screen ${hasPosition ? "selected" : ""}`}>
+          <div className="ascii-screen selected">
             <div className="screen-frame">
               <div className="screen-title">[ claw ]</div>
               <div className="screen-content">
-                {kind === "sold" && (
-                  <div className="screen-single">
-                    <div className="screen-symbol">{state?.chosenSymbol ?? "—"}</div>
-                    <div className="screen-message">{message || "position closed"}</div>
-                    <div className="screen-reason">next: selecting in a few seconds…</div>
-                  </div>
-                )}
-                {showSelecting && kind !== "sold" && (
-                  <div className="screen-empty">
-                    {kind === "idle" ? "selecting next coin…" : "searching for coins…"}
-                  </div>
-                )}
-                {hasPosition && positionMint && (
+                {positionMint && (
                   <div className="screen-single">
                     <div className="screen-symbol">{effectiveSymbol}</div>
                     <div className="screen-message">{message || "position opened"}</div>
-                    {(effectiveMcap != null || state?.chosenHolderCount != null) && (
+                    {effectiveMcap != null && (
                       <div className="screen-metrics">
-                        {effectiveMcap != null && (
-                          <span>mcap @ entry ${(effectiveMcap / 1000).toFixed(1)}k</span>
-                        )}
+                        <span>mcap @ entry ${(effectiveMcap / 1000).toFixed(1)}k</span>
                         {state?.chosenHolderCount != null && (
                           <span> · holders: {state.chosenHolderCount}</span>
                         )}
@@ -111,7 +106,7 @@ export function ChudScene({ state, trades, isHappy }: Props) {
           <img
             src={isHappy ? "/chudhappy.png" : "/chudpfptbg.png"}
             alt="Chud the Trader"
-            className={`chud-sprite ${hasPosition ? "bought" : kind}`}
+            className="chud-sprite bought"
           />
         </div>
       </div>
