@@ -1,6 +1,9 @@
 {
   "name": "chud",
   "private": true,
+  "engines": {
+    "node": ">=20.18.0"
+  },
   "scripts": {
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:web\"",
     "dev:all": "concurrently \"npm run dev:backend\" \"npm run dev:web\" \"npm run dev:bot\"",

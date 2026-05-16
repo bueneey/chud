@@ -1,3 +1,8 @@
-# Railway/Nixpacks: install full deps (including devDependencies) so tsc is available
+# Railway / Render (Nixpacks): Node for clawdbot (Solana 2.x needs >=20.18)
+[variables]
+NODE_VERSION = "20"
+NIXPACKS_NODE_VERSION = "20"
+
+# Install full deps (including devDependencies) so tsc is available
 [phases.install]
 cmds = ["npm install", "npm install --prefix clawdbot", "npm install --prefix backend", "npm install --prefix web"]
