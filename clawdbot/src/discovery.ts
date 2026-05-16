@@ -45,14 +45,12 @@ function collectFromPairs(
     if (p.chainId !== "solana") continue;
     const mint = p.baseToken.address;
     if (seen.has(mint) || exclude?.has(mint)) continue;
-    if (pumpOnly) {
-      const onPump =
-        p.dexId === "pump" ||
-        p.dexId === "pumpswap" ||
-        isPumpToken(mint) ||
-        (p.url ?? "").toLowerCase().includes("pump");
-      if (!onPump) continue;
-    }
+    const onPump =
+      p.dexId === "pump" ||
+      p.dexId === "pumpswap" ||
+      isPumpToken(mint) ||
+      (p.url ?? "").toLowerCase().includes("pump");
+    if (pumpOnly && !onPump) continue;
     const vol = p.volume?.h24 ?? 0;
     const mcap = p.fdv ?? p.marketCap ?? p.liquidity?.usd ?? 0;
     const created = p.pairCreatedAt ?? 0;
